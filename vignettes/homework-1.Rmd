@@ -1,0 +1,150 @@
+---
+title: "BIOST 537: Homework 1"
+subtitle: "Department of Biostatistics @ University of Washington"
+author:
+- Alejandro Hernandez
+date: "Winter Quarter 2025"
+output: pdf_document
+---
+
+```{r setup, include=F}
+# Clear environment
+rm(list=ls())
+
+# Setup options
+knitr::opts_chunk$set(echo=FALSE, warning=FALSE, message=FALSE)
+options(knitr.kable.NA = '-', digits = 2)
+labs = knitr::all_labels()
+labs = labs[!labs %in% c("setup", "allcode")]
+```
+
+```{r load}
+# Load relevant packages
+
+# Load data
+
+# Handle missing data
+
+```
+
+1.  (Adapted from Klein and Moeschberger, 2003) A large number of healthy individuals were enrolled in a study beginning January 1, 1970, and were followed for 31 years to assess the age at which they developed breast cancer. Individuals had clinical exams every 3 years after enrollment. For four selected individuals described below in (b) - (e), discuss the types of censoring present.
+
+(a) Discuss the type of truncation present in the study.
+
+The decision to sample healthy individuals excludes individuals who have already developed breast cancer. These truncated patients never make it into the study are are never known to exist, which induces a kind of bias. This is an example of **left truncation** of individuals who generally have shorter time-to-cancer measures.
+
+(b) Individual A enrolled in the study at age 32 and never developed breast cancer during the study.
+
+Individual A is **right-censored** because their event presumably occurred after their observation period. Their time-to-event is at least 63 years.
+
+(c) Individual B enrolled in the study at age 40 and was diagnosed with breast cancer at the fifth exam after enrollment.
+
+Individual B is **not censored**, their measured time-to-event is 55 years.
+
+(d) Individual C enrolled in the study at age 56 and died from heart failure at age 61, without ever being diagnosed with breast cancer. Post-mortem examinations confirmed that this patient never developed breast cancer.
+
+Individual C is **right-censored** because their time-to-event is not fully known, due to loss from a competing event. Their measured time-to-event is at least 61 years.
+
+(e) Individual D enrolled in the study at age 43 and moved away from the community at age 57, without ever being diagnosed with breast cancer by investigators.
+
+Individual D is also **right-censored** because their time-to-event is not fully known, due to loss of follow-up. Their measured time-to-event is at least 57 years.
+
+If instead of age at onset of breast cancer we were interested in studying the time from enrollment into the study until onset of breast cancer, would your answers above be any different? If so, how?
+
+Changing the initiating event from birth to study enrollment would change how we measure time-to-event and shorten the values we analyze.
+
+2.  You wish to study the distribution of time from diagnosis of Crohn's disease, a chronic inflammatory condition of the intestinal tract, until first bowel resection surgery or death. Suppose that you have access to a national registry of all current inflammatory bowel disease patients. On a particular date (i.e., the day of study sampling), you enroll a random collection of Crohn's disease patients currently in the registry and who have not yet had bowel resection surgery. The date of diagnosis is available for all patients, and you prospectively follow all recruited patients for 10 years. Suppose that A represents age at diagnosis, and that T is the time from diagnosis until either bowel resection surgery or death, whichever occurs first.
+
+(a) Describe the types of censoring and truncation affecting the data from this study.
+
+Censored individuals have incomplete observation.
+
+-   Patients enrolled in the study who stop following-up with researchers before their surgery or death has been known to occur are right-censored, because their event presumably occurs after their observation period.
+
+-   A patient may enroll in the study and never follow-up until some point afterward, when it is made known to the researchers that the patient's terminating event has occurred. If the exact time-to-event is uncertain, this patient's observation is left-censored.
+
+-   If a patient is observed for a period *before* the event described above occur, such that the exact time-to-event is still unknown, their observation is interval censored.
+
+Truncated individuals are never known to exist.
+
+-   Individuals who experienced the initiating event (diagnosis of Crohn's) and termintaing events (first bowel surgery or death) all before the study began are excluded from the study. These left-truncated individuals tend to have experienced shorter time-to-event, so their exclusion from study data may overrepresent longer survival times.
+
+-   Right truncation is prone to occur in retrospective studies and cannot occur here. Participants of this study cannot be excluded because their terminating event has not yet occurred.
+
+-   Individuals who have not yet experienced the initiating event or whose experience is unknown to the registry are excluded from the study. Particularly to this study, individuals who have Crohn's but are not on the national registry of all current inflammatory bowel disease patients will not be represented in the study. We cannot generalize their survival times or the impact of their exclusion on survival estimates, but if these individuals share demographics, those communities may not inform study conclusions.
+
+(b) Consider the following statement: in this study, while T is subject to truncation, A is not and hence the observed ages at diagnosis are not affected by selection bias. Do you agree with this statement? Briefly explain why.
+
+Are the observed ages at diagnosis affected by selection bias? Age of diagnosis is available for a random sample of Crohn's disease patients currently in a national registry of living inflammatory bowel disease patients. As mentioned in a previous response, people whose Crohn's diagnosis are unknown to the registry are not in the study, which may bias observed ages if there the purpose of their absence is systemic.
+
+3.  Read Dickson et al. (1989) to learn about the Mayo PBC dataset, and answer the following questions about that study:
+
+(a) What is the study population?
+
+(b) What is the initiating event (or time zero)?
+
+(c) What is the terminating event?
+
+(d) What is the time scale?
+
+(e) What are the causes of censoring?
+
+(f) For each of the causes above, comment on whether you believe the underlying censoring mechanism may be related to the outcome of interest?
+
+(g) Figure 3 in Dickson et al. (1989) presents survival curves for 106 cross-validation patients. Based on the Kaplan-Meier curves you see on this plot, for each of the three risk groups, approximately what proportion of individuals die within five years?
+
+
+4.  Investigators followed a cohort of 238 individuals with heroin use disorder who entered methadone maintenance programs in either of two clinics in Sydney, Australia over an 18-month period during the late 1980s. The purpose of the study was to identify factors associated to retention in methadone maintenance. Time from entry into the study to exit from methadone maintenance is the duration of interest. Details can be found in Caplehorn and Bell (1991). In this problem, you will perform a parametric analysis of data from this study. The dataset in question, called methadone.csv, can be found on the canvas website and loaded using the read.csv() function.
+
+The variables in this dataset are:
+
+-   `id`: patient identification number;
+
+-   `clinic`: clinic identifier;
+
+-   `event`: indicator of exit from maintenance;
+
+-   `time`: observed follow-up time (in days);
+
+-   `dose`: maintenance methadone dose (in mg/day);
+
+-   `prison`: indicator of previous incarceration.
+
+(a) Compute the average follow-up time and the proportion of censored observations.
+
+(b) Using the available data, fit exponential, Weibull and generalized gamma models to the distribution of time to exit from maintenance. For each model, report parameter estimates, associated 95% confidence intervals and maximum loglikelihood value. (NOTE: For the exponential model, report on parameter $\lambda$. For the Weibull model, report on parameters $\lambda$ and $p$. For the generalized gamma model, report on parameters $\mu$, $\sigma$ and $Q$.)
+
+(c) Plot the survival function corresponding to each of the above parametric fits as well as a nonparametric estimator of the survival function on the same graph, and comment visually on the adequacy of the models considered.
+
+(d) Is the Weibull model an appropriate simplification of the generalized gamma model in this example? Justify your answer by performing an appropriate statistical test.
+
+(e) Using a Weibull model, provide an estimate and 95% confidence interval of:
+
+```{=html}
+<!-- -->
+```
+i.  the median time until exit from maintenance;
+
+ii. the probability that no exit will occur by one year;
+
+iii. the probability that no exit will occur by two years given that no exit has occurred by one year.
+
+```{=html}
+<!-- -->
+```
+(f) Is the exponential model an appropriate simplification of the Weibull model in this example? Justify your answer by performing an appropriate statistical test.
+
+(g) Separately fit an exponential model to the subset of individuals in clinic 1 and clinic 2. Report parameter estimates and corresponding 95% confidence intervals. Use the output of these two fits to determine whether the distribution of time to exit from maintenance differs significantly by clinic. Justify your answer by performing an appropriate statistical test.
+
+(h) Repeat the last problem but substituting clinic by history of incarceration (i.e., prison)
+
+**End of report. Code appendix begins on the next page.**
+
+\pagebreak
+
+## Code Appendix
+
+```{r allcode, ref.label = knitr::all_labels(), echo=TRUE, eval=FALSE}
+```
+
+**End of document.**
