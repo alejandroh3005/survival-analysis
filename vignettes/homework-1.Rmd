@@ -12,19 +12,10 @@ output: pdf_document
 rm(list=ls())
 
 # Setup options
-knitr::opts_chunk$set(echo=FALSE, warning=FALSE, message=FALSE)
+knitr::opts_chunk$set(echo=FALSE, warning=FALSE, message=FALSE, results='hide')
 options(knitr.kable.NA = '-', digits = 2)
 labs = knitr::all_labels()
 labs = labs[!labs %in% c("setup", "allcode")]
-```
-
-```{r load}
-# Load relevant packages
-
-# Load data
-
-# Handle missing data
-
 ```
 
 1.  (Adapted from Klein and Moeschberger, 2003) A large number of healthy individuals were enrolled in a study beginning January 1, 1970, and were followed for 31 years to assess the age at which they developed breast cancer. Individuals had clinical exams every 3 years after enrollment. For four selected individuals described below in (b) - (e), discuss the types of censoring present.
@@ -40,16 +31,17 @@ Individual A is **right-censored** because their event presumably occurred after
 (c) Individual B enrolled in the study at age 40 and was diagnosed with breast cancer at the fifth exam after enrollment.
 
 Individual B is **not censored**, their measured time-to-event is 55 years.
+**Actually, it's interval!!**
 
 (d) Individual C enrolled in the study at age 56 and died from heart failure at age 61, without ever being diagnosed with breast cancer. Post-mortem examinations confirmed that this patient never developed breast cancer.
 
-Individual C is **right-censored** because their time-to-event is not fully known, due to loss from a competing event. Their measured time-to-event is at least 61 years.
+Individual C is **right-censored** because their time-to-event is not fully known, due to loss from a competing event. Their measured time-to-event is at least 61 (61+) years.
 
 (e) Individual D enrolled in the study at age 43 and moved away from the community at age 57, without ever being diagnosed with breast cancer by investigators.
 
 Individual D is also **right-censored** because their time-to-event is not fully known, due to loss of follow-up. Their measured time-to-event is at least 57 years.
 
-If instead of age at onset of breast cancer we were interested in studying the time from enrollment into the study until onset of breast cancer, would your answers above be any different? If so, how?
+(f) If instead of age at onset of breast cancer we were interested in studying the time from enrollment into the study until onset of breast cancer, would your answers above be any different? If so, how?
 
 Changing the initiating event from birth to study enrollment would change how we measure time-to-event and shorten the values we analyze.
 
@@ -110,33 +102,202 @@ The variables in this dataset are:
 
 -   `prison`: indicator of previous incarceration.
 
+```{r load}
+# Load relevant packages
+library(survival)   # survival models
+library(flexsurv)   # survival models
+library(dplyr)      # data manipulation
+
+# Load data
+methadone <- read.csv("../data/methadone.csv")
+
+anyNA(methadone)  # No missing data
+head(methadone)
+
+```
+
 (a) Compute the average follow-up time and the proportion of censored observations.
 
-(b) Using the available data, fit exponential, Weibull and generalized gamma models to the distribution of time to exit from maintenance. For each model, report parameter estimates, associated 95% confidence intervals and maximum loglikelihood value. (NOTE: For the exponential model, report on parameter $\lambda$. For the Weibull model, report on parameters $\lambda$ and $p$. For the generalized gamma model, report on parameters $\mu$, $\sigma$ and $Q$.)
+```{r question-4a}
+
+#### --- QUESTION 4 --- ####
+
+## (a) Compute the average follow-up time and the proportion of censored observations.
+
+# Summary statistics of follow-up time
+with(methadone, summary(time))
+
+# Summary of censored observations
+with(methadone, mean(event))  # 63% event observed
+with(methadone, sum(event))   # 150 observed events
+```
+
+The average follow-up time is `r with(methadone, mean(time))` days and the proportion of censored individuals is `r with(methadone, mean(event))`.
+
+(b) Using the available data, fit exponential, Weibull and generalized gamma models to the distribution of time to exit from maintenance. For each model, report parameter estimates, associated 95% confidence intervals and maximum log likelihood value. (NOTE: For the exponential model, report on parameter $\lambda$. For the Weibull model, report on parameters $\lambda$ and $p$. For the generalized gamma model, report on parameters $\mu$, $\sigma$ and $Q$.)
+
+```{r question-4b}
+
+## (b) Using the available data, fit exponential, Weibull, and generalized gamma models to the distribution of time to exit from maintenance
+
+# Import function to fit models
+source("../R/fitparametric.R")
+
+# Encode survival times
+surv_times <- with(methadone, survival::Surv(time, event))
+
+# Fit parametric survival models
+fitexp <- fitparametric(survobj = surv_times, dist = "exp") 
+fitweibull <- fitparametric(survobj = surv_times, dist = "weibull") 
+fitgengamma <- fitparametric(survobj = surv_times, dist = "gengamma")
+
+# Table of parameter estimates
+rbind(fitexp$coeff, fitweibull$coeff, fitgengamma$coeff)[,-4]
+
+# Maximum log-likelihood
+rbind(fitexp$loglik, fitweibull$loglik, fitgengamma$loglik)
+
+```
+
+From the 238 individuals enrolled in the aforementioned study, we fit three parametric models of their time from entry into the study to exit from methadone maintenance.
+
+- The exponential survival model estimates $\hat{\lambda}$ = 0.0016 (95% CI: 0.0013-0.0018) and offers a maximum log-likelihood of `r fitexp$loglik`.
+
+- The Weibull survival model estimates 
+$\hat{\lambda}$ = 0.0016 (95% CI: 0.0013-0.0018) and 
+$\hat{p}$ = 1.2264 (95% CI: 1.0603-1.3925); 
+its maximum log-likelihood of our observed data is `r fitweibull$loglik`.
+
+- The generalized gamma survival model estimates 
+$\hat{\mu}$ = 6.5502 (95% CI: 6.2694-6.8311), 
+$\hat{\sigma}$ = 0.6595 (95% CI: 0.3260-0.9930),
+$\hat{Q}$ = 1.4682 (95% CI: 0.3848-2.5516), 
+and a maximum log-likelihood of `r fitgengamma$loglik`.
 
 (c) Plot the survival function corresponding to each of the above parametric fits as well as a nonparametric estimator of the survival function on the same graph, and comment visually on the adequacy of the models considered.
 
+```{r question-4c, fig.asp=1, fig.cap="Survival estimators and corresponding parameter estimates"}
+
+## (c) Plot nonparametric and parametric estimators of the survival function
+
+# Table of coefficients (for easy access of parameter estimates in later plotting)
+coef_tab <- rbind(fitexp$coeff, 
+                  fitweibull$coeff, 
+                  fitgengamma$coeff)[,-4] %>% round(digits = 3)
+
+par(mfrow = c(2,2))
+# Plot Kaplan-Meier nonparametric survival function
+survival::survfit(surv_times ~ 1, conf.type = "log-log") %>% 
+  plot(main = "Kaplan-Meier", 
+       xlab = "Time (days)", 
+       ylab = "Survival function")
+# Plot exponential survival function
+plot(fitexp$fit, 
+     col = "seagreen", 
+     main = "Exponential", 
+     sub = paste("Lambda 95% CI:", coef_tab[1,2], "-", coef_tab[1,3]))
+# Plot Weibull survival function
+plot(fitweibull$fit, 
+     col = "orangered", 
+     main = "Weibull",
+     sub = paste("Lambda 95% CI:", coef_tab[2,2], "-", coef_tab[2,3],
+                 "\n P 95% CI:", coef_tab[3,2], "-", coef_tab[3,3]))
+# Plot generalized gamma survival function
+plot(fitgengamma$fit, 
+     col = "blue", 
+     main = "Generalized Gamma",
+     sub = paste("Mu 95% CI:", coef_tab[4,2], "-", coef_tab[5,3],
+                 "\n Sigma 95% CI:", coef_tab[5,2], "-", coef_tab[5,3],
+                 "\n Q 95% CI:", coef_tab[6,2], "-", coef_tab[6,3]))
+
+```
+
 (d) Is the Weibull model an appropriate simplification of the generalized gamma model in this example? Justify your answer by performing an appropriate statistical test.
+
+```{r question-4d}
+
+## (d) Test if the Weibull model is an appropriate simplification of the generalized gamma model
+
+```
 
 (e) Using a Weibull model, provide an estimate and 95% confidence interval of:
 
-```{=html}
-<!-- -->
-```
 i.  the median time until exit from maintenance;
 
-ii. the probability that no exit will occur by one year;
+ii. the probability that no exit will occur by one year or, in other words, the probability an individual will not have exited by one year.
 
 iii. the probability that no exit will occur by two years given that no exit has occurred by one year.
 
-```{=html}
-<!-- -->
+```{r question-4e}
+
+## (e) Estimate quantities using the Weibull model
+
+# restricted mean survival time
+fitparametric(surv_times, dist = "weibull", 
+              feature = "mean", t = max(methadone$time))
+
+# restricted median survival time
+fitparametric(surv_times, dist = "weibull", 
+              feature = "quantile", t = max(methadone$time))
+
+# probability of surviving to one year
+fitparametric(surv_times, dist = "weibull", feature = "survival", t = 365)
+
+# probability of surviving to two years, given surviving to one year
+fitparametric(surv_times, dist = "weibull", feature = "condsurvival", 
+              t0 = 365, t = 2*365)
 ```
+
 (f) Is the exponential model an appropriate simplification of the Weibull model in this example? Justify your answer by performing an appropriate statistical test.
+
+```{r question-4f}
+
+## (f) Test if the exponential model is an appropriate simplification of the Weibull model
+
+
+```
 
 (g) Separately fit an exponential model to the subset of individuals in clinic 1 and clinic 2. Report parameter estimates and corresponding 95% confidence intervals. Use the output of these two fits to determine whether the distribution of time to exit from maintenance differs significantly by clinic. Justify your answer by performing an appropriate statistical test.
 
+```{r question-4g, fig.asp=1, fig.cap="Time from entry to exit from methadone maintenence. Survival is modeled overall by a Kaplan-Meier estimator and by clinic with exponential models."}
+## (g) Fit a separate exponential model, stratified by clinic
+fitexp_clinic1 <- methadone %>% 
+  subset(clinic == 1) %>%
+  with(., Surv(time, event)) %>%
+  fitparametric(., dist = "exp")
+
+fitexp_clinic2 <- methadone %>% 
+  subset(clinic == 2) %>%
+  with(., Surv(time, event)) %>%
+  fitparametric(., dist = "exp")
+
+# Plot Kaplan-Meier estimator for all clinics
+survfit(surv_times ~ 1, conf.type = "log-log") %>% 
+  plot(xlab = "Time (days)", 
+       ylab = "Survival function")
+# Plot exponential estimator for clinic 1
+lines(fitexp_clinic1$fit, 
+     col = "seagreen", 
+     main = "Clinic 1")
+# Plot exponential estimator for clinic 2
+lines(fitexp_clinic2$fit, 
+     col = "orangered", 
+     main = "Clinic 2")
+legend(y = 1, x = 800, 
+       legend = c("Overall", "Clinic 1", "Clinic 2"), 
+       lty = c(1, 1, 1),
+       col = c("black", "seagreen","orangered"))
+
+```
+
 (h) Repeat the last problem but substituting clinic by history of incarceration (i.e., prison)
+
+```{r question-4h}
+
+## (h) Fit a separate exponential model, stratified by incarceration history
+
+
+```
 
 **End of report. Code appendix begins on the next page.**
 
