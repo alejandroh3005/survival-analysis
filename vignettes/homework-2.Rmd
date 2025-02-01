@@ -1,0 +1,202 @@
+---
+title: "BIOST 537: Homework 2"
+subtitle: "Department of Biostatistics @ University of Washington"
+author:
+- Alejandro Hernandez
+date: "Winter Quarter 2025"
+output: pdf_document
+---
+
+```{r setup, include=F}
+# Clear environment
+rm(list=ls())
+
+# Setup options
+knitr::opts_chunk$set(echo=FALSE, warning=FALSE, message=FALSE, results='hide')
+options(knitr.kable.NA = '-', digits = 2)
+labs = knitr::all_labels()
+labs = labs[!labs %in% c("setup", "allcode")]
+```
+
+```{r load}
+# Load relevant packages
+library(survival)
+library(dplyr)
+
+# Load data
+methadone <- read.csv("../data/methadone.csv")
+
+# Handle missing data
+
+```
+
+## PROBLEM 1.
+
+Consider the following trial data on time until relapse (in months) for patients in remission of acute myelogenous leukemia administered a maintenance chemotherapeutic agent or not:
+
+maintenance group: 9, 12, 13+, 18, 23, 28+, 31, 34, 45, 45+, 48, 161+
+
+control group: 4, 5, 8, 8, 10+, 12, 16+, 23, 27, 30, 38, 43, 45
+
+```{r question-1}
+#### Question 1 ####
+
+# Maintenance group survival times
+mtnc_surv <- survival::Surv(
+  time = c(9,12,13,18,23,28,31,34,45,45,48,161),
+  event = c(1,1,0,1,1,0,1,1,1,0,1,0))
+# Control group survival times
+ctrl_surv <- survival::Surv(
+  time = c(4,5,8,8,10,12,16,23,27,30,38,43,45),
+  event = c(1,1,1,1,0,1,0,1,1,1,1,1,1))
+  
+```
+
+(a) Compute the Kaplan-Meier and Nelson-Aalen estimators by filling the following tables:
+
+maintenance group:
+
+```{r question-1a1}
+mtnc_fit <- survival::survfit(mtnc_surv ~ 1, conf.type = "log-log")
+summary(mtnc_fit) %>% names
+
+```
+
+control group
+
+```{r question-1a2}
+ctrl_fit <- survfit(ctrl_surv ~ 1, conf.type = "log-log")
+summary(ctrl_fit) %>% names
+
+```
+
+(b) For each group, what is the estimated probability that no relapse will occur by 36 months?
+
+```{r}
+
+```
+
+## PROBLEM 2.
+
+In this problem, you will revisit the dataset on methadone maintenance for heroin addicts, as studied in Problem Set 1. Please refer to that homework for a description of the relevant variables.
+
+(a) Plot the Kaplan-Meier estimator of the survival function of the time until exit from maintenance along with pointwise 95% confidence intervals. What is the estimated probability that no exit will occur by one year? Provide a 95% confidence interval for your answer.
+
+```{r question-2a}
+#### QUESTION 2 ####
+# Plot K-M estimator of survival
+meth_surv <- with(methadone, Surv(time, event))
+meth_fit <- survfit(meth_surv ~ 1, conf.type = "log-log")
+plot(meth_fit)
+
+# Estimate survival to one year
+summary(meth_fit, times = 365)
+
+```
+
+
+(b) Provide the estimated median time until exit from maintenance and associated 95% confidence interval by: 
+
+i. scrutinizing values of the Kaplan-Meier estimator and associated confidence intervals (explain how you obtain your answer);
+
+ii. using the median estimate and confidence intervals provided by the survfit command.
+
+```{r question-2b}
+# Median estimate by survfit
+meth_fit # complementary log-log CI
+
+median(meth_surv) # untransformed CI
+
+```
+
+The `survfit` function estimates the median time until exit from maintenance to be 504 days, approximately 1.4 years (95% CI: 394-550 days).
+
+(c) In this part, you will investigate differences between patients with and without a history of incarceration. 
+
+i. On the same graph, plot the Kaplan-Meier estimator of the survival function of the time until exit from maintenance for patients with a history of incarceration and for patient without.
+
+```{r question-2ci, fig.cap="Kaplan-Meier estimator of time until exit from maintenance for patients with and without a history of incarceration."}
+## Plot KM estimator for patients with and without a history of incarceration
+meth_fit2 <- survfit(meth_surv ~ prison, conf.type = "log-log", data = methadone) 
+meth_fit2 %>%
+  plot(xlab = "Time (days)", ylab = "Survival function")
+
+```
+
+Investigators followed a cohort of 238 individuals with heroin use disorder who entered methadone maintenance programs in either of two clinics in Sydney, Australia over an 18-month period during the late 1980s. The purpose of the study was to identify factors associated to retention in methadone maintenance. Time from entry into the study to exit from methadone maintenance is the duration of interest. More details can be found in Caplehorn and Bell (1991).
+
+From the 238 individuals enrolled in this study, we fit two non-parametric models of time from entry into the study to exit from methadone maintenance: one for patients from with a history of incarceration and another for patients without a history of incarceration; see Figure 1.
+
+ii. Does the probability that no exit occurred by 8 months differ significantly between these two groups?
+
+```{r question-2cii}
+# Compare survival probability at 8 months
+summary(meth_fit2, times = 8*30)
+
+```
+
+iii. Based on the log-rank test, does the distribution of time until exit from maintenance differ significantly by history of incarceration?
+
+```{r question-2ciii}
+# Log-rank test of significance of prison coefficient
+survival::survdiff(meth_surv ~ prison, data = methadone)
+
+```
+
+A log-rank test determined there is insufficient evidence in our sample that time from entry into the study to exit from methadone maintenance differs significantly between patients with and without a history of incarceration at $\alpha$ = 5% (p=0.3).
+
+iv. Based on the Wilcoxon-Gehan-Breslow test, does the distribution of time until exit from maintenance differ significantly by history of incarceration?
+
+```{r question-2civ}
+
+```
+
+v. Plot estimated hazard functions for patients with and without a history of incarceration. Briefly indicate how this plot may inform you regarding the power of the logrank test as well as expected differences in the magnitude of the chi-square statistics from the logrank and Wilcoxon-Gehan-Breslow tests.
+
+```{r question-2cv}
+
+```
+
+(d) Repeat (c) but substituting history of incarceration by methadone dosage dichotomized at 60mg/day (i.e., compare the subpopulation of patients administered more than 60mg/day of methadone to the subpopulation of patients administered no more than 60 mg/day).
+
+```{r question-2d}
+# Plot KM estimator for patients with dosage above versus below 60 mg/day
+methadone$dose.bin <- ifelse(methadone$dose > 60, 1, 0)
+
+fit3 <- survfit(meth_surv ~ dose.bin, conf.type = "log-log", data = methadone) 
+fit3 %>% plot(xlab = "Time (days)", ylab = "Survival function")
+
+# Compare survival probability at 8 months
+summary(fit3, times = 8*30)
+
+# Log-rank test of significance of dosage coefficient
+survdiff(meth_surv ~ dose.bin, data = methadone)
+
+```
+
+(e) Based on a stratified log-rank test, does the time until exit from maintenance differ by history of previous incarceration adjusting for clinic membership? State explicitly what the null and alternative hypotheses are and contrast with what they are in a standard log-rank test.
+
+```{r question-2e}
+# Stratified log-rank test of significance of prison coefficient adjusting for clinic
+survdiff(meth_surv ~ dose.bin + strata(clinic), data = methadone)
+
+```
+
+
+(f) What is the estimated median residual time until exit from maintenance at 4, 8 and 12 months? Calculate these estimates using only values of the Kaplan-Meier estimator. Verify your answer using the R function provided for this purpose, and obtain 95% confidence intervals to accompany your estimates.
+
+```{r question-2f}
+
+```
+
+
+**End of report. Code appendix begins on the next page.**
+
+\pagebreak
+
+## Code Appendix
+
+```{r allcode, ref.label = knitr::all_labels(), echo=TRUE, eval=FALSE}
+```
+
+**End of document.**

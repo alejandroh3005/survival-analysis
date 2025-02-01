@@ -1,0 +1,210 @@
+---
+title: "2025 537 Survival Data Analysis: PH Model Examples"
+author: |
+  | Ting Ye
+  | Departments of Biostatistics
+  | University of Washington
+date: '`r Sys.Date()`'
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+opts_chunk$set(collapse=TRUE, fig.align='center', tidy=TRUE, tidy.opts=list(blank=TRUE, width.cutoff=50,strip.white=TRUE), warning=FALSE,message=FALSE,cache=TRUE)
+```
+
+## Mortality and FLCs
+
+```{r}
+library(survival)
+library(timereg)
+data(flchain)
+flchain$abnormalvalue<-0;
+flchain$abnormalvalue[which(flchain$lambda<0.57)]<-1;
+flchain$abnormalvalue[which(flchain$lambda>2.63)]<-1;
+flchain$abnormalvalue[which(flchain$kappa<0.33)]<-1;
+flchain$abnormalvalue[which(flchain$kappa>1.94)]<-1;
+flchain$sumflc<-flchain$lambda+flchain$kappa;
+fit_1<-coxph(Surv(futime,as.numeric(death==1))~1,subset=(lambda>=1.68),data=flchain)
+fit_0<-coxph(Surv(futime,as.numeric(death==1))~1,subset=(lambda<1.68),data=flchain)
+b_1<-basehaz(fit_1); b_0<-basehaz(fit_0);
+Lambda_0<-stepfun(b_0$time/365.25,c(0,b_0$hazard));
+Lambda_1<-stepfun(b_1$time/365.25,c(0,b_1$hazard));
+curve(Lambda_1,0,13,col=2,n=10000,ylim=c(0,0.6),xaxt='n',
+ylab="cumulative hazard",
+xlab="time from recruitment until death (in years)",cex.axis=0.8,cex.lab=0.8,lwd=1.5)
+axis(1,at=seq(0,13,by=1),cex.axis=0.8)
+curve(Lambda_0,add=TRUE,n=10000,col=4,lwd=1.5)
+legend(0,0.58,legend=c(expression(paste(kappa," FLC ")>" 1.68 "),expression(paste(kappa," FLC ")<=" 1.68 ")),fill=c(2,4),cex=0.8)
+```
+
+We examine proportionality, and not too far off:
+
+```{r}
+ratio<-function(u) Lambda_1(u)/Lambda_0(u);
+curve(ratio,1,13,ylim=c(0,6),ylab="Hazard Ratio",xlab="Time")
+```
+
+## Some examples
+
+Recall the hazard in a population defined by a covariate value $Z$ is
+$$h(t|Z) = \frac{f(t|Z)}{S(t|Z)}.$$
+
+In the first example we take a Weibull with parameters shape $a=4$ and scale $b=20$ in one group and in the second, we multiply the hazard by 2, to give a PH model.
+
+Note: Weibull model is parameterized as 
+$$f(t) = \frac{a}{b} \left( \frac{t}{b}\right)^{a-1}\exp\left[
+-\left(
+\frac{t}{b}\right)^a
+\right],$$
+for $a,b>0$.
+
+The hazard is:
+$$h(t) = \frac{a}{b} \left( \frac{t}{b}\right)^{a-1}
+$$
+which is either monotonic increasing in time if $a>1$, monotonic decreasing if $a<1$ and constant if $a=1$.
+
+```{r}
+curve(dweibull(x,4,20)/pweibull(x,4,20,lower.tail=F),0,40,ylab="hazard",xlab="time",cex.axis=0.8,cex.lab=0.8,ylim=c(0,4),lwd=1.5)
+curve(2*dweibull(x,4,20)/pweibull(x,4,20,lower.tail=F),col=2,add=TRUE,lwd=1.5)
+```
+
+In the second example we take a gamma with parameters shape $a=4$ and rate $r=2$ in one group and in the second, we multiply the hazard by 1.5, to give a PH model.
+
+Note: gamma model with shape $a$ and rate $r$ is parameterized as 
+$$f(t) = \frac{r^a}{\Gamma(a)}t^{a-1}\exp(-r t ),$$
+for $a,r>0$.
+
+The hazard is not available in closed form but
+is either monotonic increasing in time if $a>1$, monotonic decreasing if $a<1$ and constant if $a=1$.
+
+```{r}
+curve(dgamma(x,shape=4,rate=2)/pgamma(x,shape=4,rate=2,lower.tail=F),0,8,ylab="hazard",xlab="time",cex.axis=0.8,cex.lab=0.8,ylim=c(0,3),lwd=1.5)
+curve(1.5*dgamma(x,shape=4,rate=2)/pgamma(x,shape=4,rate=2,lower.tail=F),col=2,add=TRUE,lwd=1.5)
+```
+
+Now we produce a non-proportional hazards by taking a baseline Weibull and multiplying the hazard by a non-constant function in time.
+```{r}
+curve(dweibull(x,4,20)/pweibull(x,4,20,lower.tail=F),0,40,ylab="hazard",xlab="time",cex.axis=0.8,cex.lab=0.8,ylim=c(0,2),lwd=1.5)
+curve(0.7*sin(x/14)*dweibull(x,4,20)/pweibull(x,4,20,lower.tail=F),col=2,add=TRUE,lwd=1.5)
+```
+
+Next, we produce Weibull and gamma survivor functions which cross and therefore cannot be PH.
+
+```{r}
+curve(1-pweibull(x,4,20),0,50,ylab="survival probability",xlab="time",cex.axis=0.8,cex.lab=0.8,ylim=c(0,1),lwd=1.5)
+curve(1-pgamma(3.5*x,3,1/20),col=2,add=TRUE,lwd=1.5)
+```
+
+The final example considers two different gamma functions. First we plot the survivor functions:
+```{r}
+curve(1-pgamma(4*x,3,1/20),0,50,ylab="survival probability",xlab="time",cex.axis=0.8,cex.lab=0.8,ylim=c(0,1),lwd=1.5)
+curve(1-pgamma(6*x,3,1/20),col=2,add=TRUE,lwd=1.5)
+```
+
+The hazard functions are below, and we do not have PH.
+```{r}
+curve(dgamma(4*x,3,1/20)/pgamma(4*x,3,1/20,lower.tail=F),0,50,ylab="hazard",xlab="time",cex.axis=0.8,cex.lab=0.8,ylim=c(0,0.05),lwd=1.5)
+curve(dgamma(6*x,3,1/20)/pgamma(6*x,3,1/20,lower.tail=F),col=2,add=TRUE,lwd=1.5)
+```
+
+## Examples of Cox PH Modeling with the Herpes Data
+
+Association with Sex
+
+```{r}
+library(foreign)
+library(msm)
+herpes = read.csv("herpes.csv")
+s.herpes = with(herpes, Surv(timetorec, event))
+herpes.cox.1 = coxph(s.herpes ~ male, data=herpes)
+summary(herpes.cox.1)
+```
+Association with Type as Quantitative
+```{r}
+herpes.cox.2 = coxph(s.herpes ~ type, data=herpes)
+summary(herpes.cox.2)
+```
+
+Type as a Factor
+ 
+```{r}
+herpes$type. = as.factor(herpes$type)
+herpes.cox.3 = coxph(s.herpes ~ type., data=herpes)
+summary(herpes.cox.3)
+```
+Association with Treatment 
+```{r}
+survdiff(s.herpes ~ treat, data=herpes)
+```
+
+Treatment as Quantitative
+
+```{r}
+herpes.cox.4 = coxph(s.herpes ~ treat, data=herpes)
+summary(herpes.cox.4)
+```
+
+Treatment as Four-Level Factor
+```{r}
+herpes$treat. = as.factor(herpes$treat)
+herpes.cox.5 = coxph(s.herpes ~ treat., data=herpes)
+summary(herpes.cox.5)
+```
+
+Treatment as Two-Level Factor
+```{r}
+herpes$treat.any = as.numeric(herpes$treat>0)
+herpes.cox.6 = coxph(s.herpes ~ treat.any, data=herpes)
+summary(herpes.cox.6)
+```
+
+Duration
+```{r}
+herpes.cox.7 = coxph(s.herpes ~ duration, data=herpes)
+summary(herpes.cox.7)
+```
+
+Joint Analysis
+```{r}
+herpes.cox.joint = coxph(s.herpes ~ male + type. + treat. + duration, 
+     data=herpes)
+summary(herpes.cox.joint)$coef
+```
+
+Joint Analysis
+```{r}
+herpes.cox.joint.int = coxph(s.herpes ~ male + type.*treat. + duration, 
+    data=herpes)
+summary(herpes.cox.joint.int)$coef
+```
+
+Why is there no hazard ratio estimate for the type=3/treat=3 subgroup?
+```{r}
+table(herpes$treat, herpes$type, dnn = c("treat", "type"))
+```
+
+How do more complex models compare to simpler ones?
+```{r}
+anova(herpes.cox.joint.int, herpes.cox.joint)
+```
+Conclude that interactions not required.
+
+```{r}
+anova(herpes.cox.joint, herpes.cox.5)
+```
+
+Conclude that treatment only model too simple.
+
+## Examples of Cox PH Modeling with the Trace Data
+
+```{r}
+trace = read.dta("traceST11.dta")
+head(trace)
+s.trace = with(trace, Surv(time, (status==9)))
+trace.cox.1 = coxph(s.trace ~ wmi, data=trace)
+summary(trace.cox.1)
+```
+
