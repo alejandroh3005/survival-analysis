@@ -20,8 +20,11 @@ labs = labs[!labs %in% c("setup", "allcode")]
 
 ```{r load}
 # Load relevant packages
-library(survival)
-library(dplyr)
+library(survival)  # survival model
+library(dplyr)  # data manipulation
+library(knitr)  # pretty tables
+library(ggplot2)  # data visualization
+library(survminer)
 
 # Load data
 methadone <- read.csv("../data/methadone.csv")
@@ -34,9 +37,9 @@ methadone <- read.csv("../data/methadone.csv")
 
 Consider the following trial data on time until relapse (in months) for patients in remission of acute myelogenous leukemia administered a maintenance chemotherapeutic agent or not:
 
-maintenance group: 9, 12, 13+, 18, 23, 28+, 31, 34, 45, 45+, 48, 161+
+Maintenance group: 9, 12, 13+, 18, 23, 28+, 31, 34, 45, 45+, 48, 161+.
 
-control group: 4, 5, 8, 8, 10+, 12, 16+, 23, 27, 30, 38, 43, 45
+Control group: 4, 5, 8, 8, 10+, 12, 16+, 23, 27, 30, 38, 43, 45.
 
 ```{r question-1}
 #### Question 1 ####
@@ -52,29 +55,51 @@ ctrl_surv <- survival::Surv(
   
 ```
 
-(a) Compute the Kaplan-Meier and Nelson-Aalen estimators by filling the following tables:
+(a) Compute the Kaplan-Meier and Nelson-Aalen estimators by filling the following tables for the control and maintenance group.
 
-maintenance group:
-
-```{r question-1a1}
+```{r question-1a1, results='asis'}
+# Survival table for treated
 mtnc_fit <- survival::survfit(mtnc_surv ~ 1, conf.type = "log-log")
-summary(mtnc_fit) %>% names
+mtnc_surv_tab <- data.frame(summary(mtnc_fit)[c(2,3,4,6,8)]) 
+mtnc_surv_tab$"d/n" <- with(mtnc_surv_tab, n.event / n.risk)
+mtnc_surv_tab$"1-d/n" <- 1 - mtnc_surv_tab$"d/n"
+
+mtnc_surv_tab[,c(1,2,3,6,7,4,5)] %>%
+  knitr::kable(
+    col.names = c("Time", "At risk (n)", "Events (d)", "d/n", "1-d/n", "K-M S(t)", 
+                  "N-A H(t)"),
+    caption = "Survival table of remission patients administered maintenance treatment.")
 
 ```
 
-control group
-
-```{r question-1a2}
+```{r question-1a2, results='asis'}
+# Survival table for controls
 ctrl_fit <- survfit(ctrl_surv ~ 1, conf.type = "log-log")
-summary(ctrl_fit) %>% names
+ctrl_surv_tab <- data.frame(summary(ctrl_fit)[c(2,3,4,6,8)]) 
+ctrl_surv_tab$"d/n" <- with(ctrl_surv_tab, n.event / n.risk)
+ctrl_surv_tab$"1-d/n" <- 1 - ctrl_surv_tab$"d/n"
+
+ctrl_surv_tab[,c(1,2,3,6,7,4,5)] %>%
+  kable(
+    col.names = c("Time", "At risk (n)", "Events (d)", "d/n", "1-d/n", "K-M S(t)",
+                  "N-A H(t)"),
+    caption = "Survival table of remission patients administered a control treatment.")
 
 ```
 
 (b) For each group, what is the estimated probability that no relapse will occur by 36 months?
 
-```{r}
+```{r question-1b}
+# Maintenance group
+summary(mtnc_fit, times = 36) 
+# Control group
+summary(ctrl_fit, times = 36) 
 
 ```
+
+We fit two nonparametric Kaplan-Meier models of time until relapse for patients in remission of acute myelogenous leukemia, based on whether they were administered a maintenance chemotherapeutic agent or not. Our target is each group's probability of reaching 36 months without relapsing. We estimate this probability to be 0.432 (95% CI\*: 0.141-0.698) among the maintenance group and 0.303 (95% CI\*: 0.076-0.574) among the control group.
+
+\* Confidence intervals were computed using the "complementary log-log" technique, to ensure they fall within the [0,1] interval.
 
 ## PROBLEM 2.
 
@@ -82,44 +107,71 @@ In this problem, you will revisit the dataset on methadone maintenance for heroi
 
 (a) Plot the Kaplan-Meier estimator of the survival function of the time until exit from maintenance along with pointwise 95% confidence intervals. What is the estimated probability that no exit will occur by one year? Provide a 95% confidence interval for your answer.
 
-```{r question-2a}
+```{r question-2a, fig.asp=1, fig.cap="Time from entry to exit from methadone maintenence. Survival is modeled by a nonparametric Kaplan-Meier estimator."}
 #### QUESTION 2 ####
 # Plot K-M estimator of survival
 meth_surv <- with(methadone, Surv(time, event))
-meth_fit <- survfit(meth_surv ~ 1, conf.type = "log-log")
-plot(meth_fit)
+meth_fit <- survfit(meth_surv ~ 1, data = methadone, conf.type = "log-log")
+plot(meth_fit, conf.int = TRUE, col = "darkblue",
+     ylab = "Survival function", xlab = "Time (days)")
 
 # Estimate survival to one year
 summary(meth_fit, times = 365)
 
 ```
+We fit a Kaplan-Meier model of time from entry to exit from methadone maintenance. We estimate the probability of reaching 1 year without exiting is 0.606 (95% clog-log CI: 0.538-0.667).
 
+```{r question-2a-supplementary}
+# # With ggplot
+# survminer::ggsurvplot(meth_fit, data=methadone, ggtheme=theme_bw(), 
+#                     conf.int=TRUE, xlab="", ylab="")
+# ggsurvplot(meth_fit, data=methadone, ggtheme=theme_bw(), 
+#            risk.table = TRUE, conf.int=TRUE, xlab="", ylab="")
 
-(b) Provide the estimated median time until exit from maintenance and associated 95% confidence interval by: 
+# Facet
+# survminer::ggsurvplot_facet(meth_fit, 
+#                             facet.by=c("clinic"), # in data, not model
+#               # facet.by is only for fit models that already have some covariate
+#                             data=methadone)
 
-i. scrutinizing values of the Kaplan-Meier estimator and associated confidence intervals (explain how you obtain your answer);
+# Other arguments
+# censor = TRUE
+# legend.labs = c("Survival Estimate")
+# legend.title = ""
+# legend = c(0.8, 0.8)
+# palette = "purple"
 
-ii. using the median estimate and confidence intervals provided by the survfit command.
+```
+
+(b) Provide the estimated median time until exit from maintenance and associated 95% confidence interval by:
+
+i.  scrutinizing values of the Kaplan-Meier estimator and associated confidence intervals (explain how you obtain your answer);
+
+ii. using the median estimate and confidence intervals provided by the `survfit` command.
 
 ```{r question-2b}
 # Median estimate by survfit
 meth_fit # complementary log-log CI
 
 median(meth_surv) # untransformed CI
+quantile(meth_fit, prob = 0.5) # using clog-log
 
 ```
 
 The `survfit` function estimates the median time until exit from maintenance to be 504 days, approximately 1.4 years (95% CI: 394-550 days).
 
-(c) In this part, you will investigate differences between patients with and without a history of incarceration. 
+(c) In this part, you will investigate differences between patients with and without a history of incarceration.
 
-i. On the same graph, plot the Kaplan-Meier estimator of the survival function of the time until exit from maintenance for patients with a history of incarceration and for patient without.
+i.  On the same graph, plot the Kaplan-Meier estimator of the survival function of the time until exit from maintenance for patients with a history of incarceration and for patient without.
 
-```{r question-2ci, fig.cap="Kaplan-Meier estimator of time until exit from maintenance for patients with and without a history of incarceration."}
+```{r question-2ci, fig.asp=1, fig.cap="Kaplan-Meier estimator of time until exit from maintenance for patients with and without a history of incarceration."}
 ## Plot KM estimator for patients with and without a history of incarceration
 meth_fit2 <- survfit(meth_surv ~ prison, conf.type = "log-log", data = methadone) 
-meth_fit2 %>%
-  plot(xlab = "Time (days)", ylab = "Survival function")
+meth_fit2 %>% 
+  plot(xlab = "Time (days)", ylab = "Survival function", conf.int = TRUE,
+       col = c("darkblue", "lightblue"))
+legend(500, 0.97, fill = c("darkblue", "lightblue"), bty = "n",
+       legend = c("History of incarceration","No history of incarceration"))
 
 ```
 
@@ -131,7 +183,11 @@ ii. Does the probability that no exit occurred by 8 months differ significantly 
 
 ```{r question-2cii}
 # Compare survival probability at 8 months
-summary(meth_fit2, times = 8*30)
+temp <- summary(meth_fit2, times = 8*30)
+wald_tstat <- abs(diff(temp$surv)) / sqrt(sum(temp$std.err^2))
+pval <- 2 * pnorm(wald_tstat, lower.tail = FALSE)
+# "If the p is low, the null must go!"
+pval < 0.05  # FALSE
 
 ```
 
@@ -151,7 +207,7 @@ iv. Based on the Wilcoxon-Gehan-Breslow test, does the distribution of time unti
 
 ```
 
-v. Plot estimated hazard functions for patients with and without a history of incarceration. Briefly indicate how this plot may inform you regarding the power of the logrank test as well as expected differences in the magnitude of the chi-square statistics from the logrank and Wilcoxon-Gehan-Breslow tests.
+v.  Plot estimated hazard functions for patients with and without a history of incarceration. Briefly indicate how this plot may inform you regarding the power of the logrank test as well as expected differences in the magnitude of the chi-square statistics from the logrank and Wilcoxon-Gehan-Breslow tests.
 
 ```{r question-2cv}
 
@@ -182,13 +238,11 @@ survdiff(meth_surv ~ dose.bin + strata(clinic), data = methadone)
 
 ```
 
-
 (f) What is the estimated median residual time until exit from maintenance at 4, 8 and 12 months? Calculate these estimates using only values of the Kaplan-Meier estimator. Verify your answer using the R function provided for this purpose, and obtain 95% confidence intervals to accompany your estimates.
 
 ```{r question-2f}
 
 ```
-
 
 **End of report. Code appendix begins on the next page.**
 
