@@ -21,10 +21,11 @@ labs = labs[!labs %in% c("setup", "allcode")]
 ```{r load}
 # Load relevant packages
 library(survival)  # survival model
-library(dplyr)  # data manipulation
-library(knitr)  # pretty tables
-library(ggplot2)  # data visualization
-library(survminer)
+library(dplyr)     # data manipulation
+library(knitr)     # pretty tables
+library(ggplot2)   # data visualization
+library(muhaz)     # hazard function
+
 
 # Load data
 methadone <- read.csv("../data/methadone.csv")
@@ -97,9 +98,7 @@ summary(ctrl_fit, times = 36)
 
 ```
 
-We fit two nonparametric Kaplan-Meier models of time until relapse for patients in remission of acute myelogenous leukemia, based on whether they were administered a maintenance chemotherapeutic agent or not. Our target is each group's probability of reaching 36 months without relapsing. We estimate this probability to be 0.432 (95% CI\*: 0.141-0.698) among the maintenance group and 0.303 (95% CI\*: 0.076-0.574) among the control group.
-
-\* Confidence intervals were computed using the "complementary log-log" technique, to ensure they fall within the [0,1] interval.
+We fit two nonparametric Kaplan-Meier models of time until relapse for patients in remission of acute myelogenous leukemia, based on whether they were administered a maintenance chemotherapeutic agent or not. Our target is each group's probability of reaching 36 months without relapsing. We estimate this probability to be 0.432 (95% CI: 0.141-0.698) among the maintenance group and 0.303 (95% CI: 0.076-0.574) among the control group.
 
 ## PROBLEM 2.
 
@@ -107,8 +106,11 @@ In this problem, you will revisit the dataset on methadone maintenance for heroi
 
 (a) Plot the Kaplan-Meier estimator of the survival function of the time until exit from maintenance along with pointwise 95% confidence intervals. What is the estimated probability that no exit will occur by one year? Provide a 95% confidence interval for your answer.
 
+See Figure 1. We fit a Kaplan-Meier model of time from entry to exit from methadone maintenance. We estimate the probability of reaching 1 year without exiting is 0.606 (95% CI: 0.538-0.667).
+
 ```{r question-2a, fig.asp=1, fig.cap="Time from entry to exit from methadone maintenence. Survival is modeled by a nonparametric Kaplan-Meier estimator."}
 #### QUESTION 2 ####
+
 # Plot K-M estimator of survival
 meth_surv <- with(methadone, Surv(time, event))
 meth_fit <- survfit(meth_surv ~ 1, data = methadone, conf.type = "log-log")
@@ -116,30 +118,7 @@ plot(meth_fit, conf.int = TRUE, col = "darkblue",
      ylab = "Survival function", xlab = "Time (days)")
 
 # Estimate survival to one year
-summary(meth_fit, times = 365)
-
-```
-We fit a Kaplan-Meier model of time from entry to exit from methadone maintenance. We estimate the probability of reaching 1 year without exiting is 0.606 (95% clog-log CI: 0.538-0.667).
-
-```{r question-2a-supplementary}
-# # With ggplot
-# survminer::ggsurvplot(meth_fit, data=methadone, ggtheme=theme_bw(), 
-#                     conf.int=TRUE, xlab="", ylab="")
-# ggsurvplot(meth_fit, data=methadone, ggtheme=theme_bw(), 
-#            risk.table = TRUE, conf.int=TRUE, xlab="", ylab="")
-
-# Facet
-# survminer::ggsurvplot_facet(meth_fit, 
-#                             facet.by=c("clinic"), # in data, not model
-#               # facet.by is only for fit models that already have some covariate
-#                             data=methadone)
-
-# Other arguments
-# censor = TRUE
-# legend.labs = c("Survival Estimate")
-# legend.title = ""
-# legend = c(0.8, 0.8)
-# palette = "purple"
+# summary(meth_fit, times = 365)
 
 ```
 
@@ -150,15 +129,17 @@ i.  scrutinizing values of the Kaplan-Meier estimator and associated confidence 
 ii. using the median estimate and confidence intervals provided by the `survfit` command.
 
 ```{r question-2b}
-# Median estimate by survfit
-meth_fit # complementary log-log CI
+# Median estimate by K-M output
+summary(meth_fit, times = c(393, 394, 496, 504, 546, 550))
 
+# Median estimate by survfit()
 median(meth_surv) # untransformed CI
 quantile(meth_fit, prob = 0.5) # using clog-log
 
 ```
+The Kaplan-Meier survival function estimates median time until exit from maintenance to be 496 days, approximately 1.4 years (95% CI: 393-546 days). The CI for this median was constructed the set of times in which S(t)=0.5 could be true.
 
-The `survfit` function estimates the median time until exit from maintenance to be 504 days, approximately 1.4 years (95% CI: 394-550 days).
+The `survfit` function estimates the median time to be 504 days, approximately 1.4 years (95% CI: 394-550 days).
 
 (c) In this part, you will investigate differences between patients with and without a history of incarceration.
 
@@ -169,15 +150,15 @@ i.  On the same graph, plot the Kaplan-Meier estimator of the survival function 
 meth_fit2 <- survfit(meth_surv ~ prison, conf.type = "log-log", data = methadone) 
 meth_fit2 %>% 
   plot(xlab = "Time (days)", ylab = "Survival function", conf.int = TRUE,
-       col = c("darkblue", "lightblue"))
-legend(500, 0.97, fill = c("darkblue", "lightblue"), bty = "n",
-       legend = c("History of incarceration","No history of incarceration"))
+       col = c("lightblue", "darkblue"))
+legend(500, 0.97, fill = c("lightblue", "darkblue"), bty = "n",
+       legend = c("No history of incarceration","History of incarceration"))
 
 ```
 
 Investigators followed a cohort of 238 individuals with heroin use disorder who entered methadone maintenance programs in either of two clinics in Sydney, Australia over an 18-month period during the late 1980s. The purpose of the study was to identify factors associated to retention in methadone maintenance. Time from entry into the study to exit from methadone maintenance is the duration of interest. More details can be found in Caplehorn and Bell (1991).
 
-From the 238 individuals enrolled in this study, we fit two non-parametric models of time from entry into the study to exit from methadone maintenance: one for patients from with a history of incarceration and another for patients without a history of incarceration; see Figure 1.
+See Figure 2. From the 238 individuals enrolled in this study, we fit two non-parametric models of time from entry into the study to exit from methadone maintenance: one for patients from with a history of incarceration and another for patients without a history of incarceration.
 
 ii. Does the probability that no exit occurred by 8 months differ significantly between these two groups?
 
@@ -191,6 +172,8 @@ pval < 0.05  # FALSE
 
 ```
 
+A Wald's test using Greenwood's estimation of standard error determined there is insufficient evidence in our sample the probability of lasting 8 months without exit is statistically different between patients with and without a history of incarceration, at $\alpha$ = 5% (p=0.077)
+
 iii. Based on the log-rank test, does the distribution of time until exit from maintenance differ significantly by history of incarceration?
 
 ```{r question-2ciii}
@@ -199,50 +182,134 @@ survival::survdiff(meth_surv ~ prison, data = methadone)
 
 ```
 
-A log-rank test determined there is insufficient evidence in our sample that time from entry into the study to exit from methadone maintenance differs significantly between patients with and without a history of incarceration at $\alpha$ = 5% (p=0.3).
+A log-rank test determined there is insufficient evidence in our sample that time from entry into the study to exit from methadone maintenance differs significantly between patients with and without a history of incarceration (p=0.3).
 
 iv. Based on the Wilcoxon-Gehan-Breslow test, does the distribution of time until exit from maintenance differ significantly by history of incarceration?
 
 ```{r question-2civ}
+#WGB test to do a weighted log-rank test
+#do this by setting rho = 1 for survdiff
+survdiff(meth_surv ~ prison, data = methadone, rho = 1)
 
 ```
 
-v.  Plot estimated hazard functions for patients with and without a history of incarceration. Briefly indicate how this plot may inform you regarding the power of the logrank test as well as expected differences in the magnitude of the chi-square statistics from the logrank and Wilcoxon-Gehan-Breslow tests.
+The Wilcoxon-Gehan-Breslow (WGB) weighted log-rank test, which emphasizes separation between survival curves at earlier study times, makes the same conclusion as the unweighted log-rank test (p=0.1).
 
-```{r question-2cv}
+v. Plot estimated hazard functions for patients with and without a history of incarceration. Briefly indicate how this plot may inform you regarding the power of the log-rank test as well as expected differences in the magnitude of the chi-square statistics from the logrank and Wilcoxon-Gehan-Breslow tests.
+
+```{r question-2cv, fig.cap="Kernel-based estimator of hazard function (risk of exiting from maintenance in the next instant) for patients with and without a history of incarceration."}
+# Plot hazard functions, stratified by incarceration history
+with(subset(methadone, prison==0), muhaz(time, event)) %>% 
+  plot(col = "lightblue", lwd = 2)
+with(subset(methadone, prison==1), muhaz::muhaz(time, event)) %>% 
+  lines(col = "darkblue", lwd = 2)
+legend("topleft", fill = c("darkblue", "lightblue"), bty = "n",
+       legend = c("History of incarceration","No history of incarceration"))
 
 ```
+
+See Figure 3. The log-rank test has the strongest power when the groups it compares have proportional hazard throughout the study period. Overlapping hazard curves indicate our test will have low power. We can expect the weighted WGB test to have a comparatively larger test statistic, due to separate hazard curves around the beginning of the study.
 
 (d) Repeat (c) but substituting history of incarceration by methadone dosage dichotomized at 60mg/day (i.e., compare the subpopulation of patients administered more than 60mg/day of methadone to the subpopulation of patients administered no more than 60 mg/day).
 
-```{r question-2d}
-# Plot KM estimator for patients with dosage above versus below 60 mg/day
+Figure 4 shows survival estimates. Figure 5 shows estimated hazard functions.
+
+A Wald's test using Greenwood's estimation of standard error determined there is insufficient evidence in our sample the probability of lasting 8 months without exit is statistically different for patients with administered methadone dosage higher and lower than 60 m/day (p<0.001).
+
+A log-rank test determined there is sufficient evidence in our sample that time from entry into the study to exit from methadone maintenance differs significantly between dosage groups (p<0.001). A weighted WGB log-rank test agrees (p<0.001).
+
+```{r question-2d-1, fig.asp=1, fig.cap="Kaplan-Meier estimator of time until exit from maintenance for patients with administered methadone dosage higher and lower than 60 m/day."}
+# Define binary dosage variable
 methadone$dose.bin <- ifelse(methadone$dose > 60, 1, 0)
 
+# Plot KM estimator for patients with dosage above versus below 60 mg/day
 fit3 <- survfit(meth_surv ~ dose.bin, conf.type = "log-log", data = methadone) 
-fit3 %>% plot(xlab = "Time (days)", ylab = "Survival function")
+fit3 %>%
+  plot(xlab = "Time (days)", ylab = "Survival function", conf.int = TRUE,
+       col = c("lightgreen", "darkgreen"))
+legend("topright", fill = c("lightgreen", "darkgreen"), bty = "n",
+       legend = c("Dosage 60 mg/day or less", "Dosage over 60 mg/day"))
 
+```
+
+```{r question-2d-2}
 # Compare survival probability at 8 months
-summary(fit3, times = 8*30)
+temp2 <- summary(fit3, times = 8*30)
+wald_tstat2 <- abs(diff(temp2$surv)) / sqrt(sum(temp2$std.err^2))
+pval2 <- 2 * pnorm(wald_tstat2, lower.tail = FALSE)
+# "If the p is low, the null must go!"
+pval2 < 0.05  # TRUE
 
 # Log-rank test of significance of dosage coefficient
 survdiff(meth_surv ~ dose.bin, data = methadone)
+# WGB weighed log-rank test
+survdiff(meth_surv ~ dose.bin, data = methadone, rho = 1)
+
+```
+
+```{r question-2d-3, fig.cap="Kernel-based estimator of hazard function (risk of exiting from maintenance in the next instant) for two dosage groups."}
+# Plot hazard functions, stratified by incarceration history
+with(subset(methadone, dose.bin==0), muhaz(time, event)) %>% 
+  plot(col = "lightgreen", lwd = 2)
+with(subset(methadone, dose.bin==1), muhaz::muhaz(time, event)) %>% 
+  lines(col = "darkgreen", lwd = 2)
+legend("topleft", fill = c("darkgreen", "lightgreen"), bty = "n",
+       legend = c("Dosage 60 mg/day or less", "Dosage over 60 mg/day"))
 
 ```
 
 (e) Based on a stratified log-rank test, does the time until exit from maintenance differ by history of previous incarceration adjusting for clinic membership? State explicitly what the null and alternative hypotheses are and contrast with what they are in a standard log-rank test.
 
 ```{r question-2e}
+# Chi-squared test of dosage group and clinic
+table(methadone$dose.bin, methadone$clinic) %>% addmargins %>% chisq.test
+# p=0.2 indicates the two are unrelated
+
 # Stratified log-rank test of significance of prison coefficient adjusting for clinic
 survdiff(meth_surv ~ dose.bin + strata(clinic), data = methadone)
+# p<0.001
 
 ```
+
+A stratified log-rank test evaluates whether survival differs between dosage groups within clinic 1 or clinic 2. The test's null hypothesis is that they do not differ in either clinic, and the alternative hypothesis is that they differ in at least one clinic. This is distinct from the regular log-rank test we conducted earlier, which assessed overall difference between dosage groups, ignorant of clinic. In this instance, a stratified log-rank test has rejected the null hypothesis (p<0.001).
 
 (f) What is the estimated median residual time until exit from maintenance at 4, 8 and 12 months? Calculate these estimates using only values of the Kaplan-Meier estimator. Verify your answer using the R function provided for this purpose, and obtain 95% confidence intervals to accompany your estimates.
 
 ```{r question-2f}
+## Estimate median residual times
+# From K-M estimator
+temp3 <- data.frame(time = summary(meth_fit)$time)
+temp3$timefrom4mo <- pmax(temp3$time - 4*30, 0)
+temp3$timefrom8mo <- pmax(temp3$time - 8*30, 0)
+temp3$timefrom12mo <- pmax(temp3$time - 12*30, 0)
+# Replace 0 to NA (for later exclusion from median function)
+temp3[temp3==0] <- NA
+# Estimate median residual times
+temp3[-1] %>% lapply(median, na.rm = TRUE)
+
+# From provided function
+source("../materials/getmedianres.R")
+getmedianres(meth_surv, times = c(4*30,8*30,12*30), confint = TRUE)
 
 ```
+
+Using the K-M estimates, we estimate median residual time at the following times to be:
+
+- 4 months (120 days): 248 days
+
+- 8 months (240 days): 256 days
+
+- 12 months (360 days): 183 days
+
+Using the `getmedianres.R` script, we estimate this quantity to be:
+
+- 4 months: 420 days (95% interval\*: 376-526)
+
+- 8 months: 427 days (95% interval\*: 341-515)
+
+- 12 months: 389 days (95% interval\*: 301-461)
+
+\*95% interval from 2000 boostrapped resamples
 
 **End of report. Code appendix begins on the next page.**
 
