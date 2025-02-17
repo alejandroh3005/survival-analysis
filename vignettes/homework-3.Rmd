@@ -1,0 +1,196 @@
+---
+title: "BIOST 537: Homework 3"
+subtitle: "Department of Biostatistics @ University of Washington"
+author:
+- Alejandro Hernandez
+date: "Winter Quarter 2025"
+output: pdf_document
+---
+
+```{r setup, include=F}
+# Clear environment
+rm(list=ls())
+
+# Setup options
+knitr::opts_chunk$set(echo=FALSE, warning=FALSE, message=FALSE, results='hide')
+options(knitr.kable.NA = '-', digits = 2)
+labs = knitr::all_labels()
+labs = labs[!labs %in% c("setup", "allcode")]
+```
+
+```{r load}
+# Load relevant packages
+library(survival)  # survival model
+library(dplyr)     # data manipulation
+library(modelr)    # model manipulation
+library(survminer)
+
+# library(knitr)     # pretty tables
+# library(ggplot2)   # data visualization
+
+# library(muhaz)     # hazard function
+
+# Load data
+methadone <- read.csv("../data/methadone.csv")
+
+# Handle missing data
+
+```
+
+## PROBLEM 1.
+
+In the CCG803 study, 268 children in remission of acute lymphoblastic leukemia (a type of blood cancer) were recruited from a number of clinical institutions and randomized to one of two maintenance regimes. Patients in the control group were assigned to the standard of care--chemotherapy with 6MP and methotrexate--while patients in the treatment group were also given dactinomycin.
+
+Dactinomycin administration (`rx`), age at baseline (`age`), white blood cell count (`wbc`), clinical institution (`institution`), observed follow-up time (`duration`) and relapse status at end of follow-up (`relapse`) were recorded for each patient. The dataset, called **ccg803.csv**, can be found on the canvas website.
+
+(a) Describe and fit a proportional hazards model to estimate the association between risk of relapse and treatment. Provide an estimate and 95% confidence interval for the hazard ratio.
+
+```{r question-1a}
+#### Question 1 ####
+ccg_dat <- read.csv("../data/ccg803.csv")
+ccg_surv <- with(ccg_dat, survival::Surv(duration, relapse))
+
+# Fit a PH model of time to relapse from treatment
+survival::coxph(ccg_surv ~ rx, ccg_dat) %>% summary
+
+```
+
+We fit a Cox proportional hazards model of time until blood cancer relapse given a patient's treatment group. We estimate the hazards ratio comparing patients who were administered Dactinomycin treatment with standard-of-care to those with only standard-of-care to be 0.738 (95% CI: 0.55-0.992). Because our confidence interval for the hazard ratio ranges from half to equal, we cannot claim with certainty that the sample has sufficient statistical evidence of Dactinomycin being associated with better outcomes. This is illustrated in all three provided statistical tests producing p-values that are approximately equal to $\alpha$.
+
+(b) Describe and fit a proportional hazards model to estimate the association between risk of relapse and treatment adjusting for white blood cell count and age. Provide an estimate and 95% confidence interval for each of the resulting hazard ratios
+
+```{r question-1b}
+# Fit a PH model of time to relapse from treatment, WBC, and age
+coxph(ccg_surv ~ rx + wbc + age, ccg_dat) %>% summary
+
+```
+
+We fit a Cox proportional hazards model of time until blood cancer relapse given a patient's treatment group, adjusting for white blood cell count and age at baseline. We estimate the hazards ratio comparing two patient populations of the same white blood cell count and age at baseline, who differ in their inclusion of Dactinomycin to a standard-of-care treatment, to be 0.744 (95% CI: 0.553-0.999), with those administered Dactinomycin facing lower risk of relapse. 
+From this model, we again believe the probability of entering cancer relapse is higher for patients who did not receive Dactinomycin, although the statistical evidence is not strong according to our significance level.
+
+(c) Describe and fit a proportional hazards model to determine whether the association between risk of relapse and treatment adjusting for white blood cell count and age differs in subpopulations of patients defined by white blood cell count being either below 10,000 (`wbc`<100), or above or at 10,000 (`wbc`>=100). Provide an estimate and 95% confidence interval for the hazard ratio corresponding to each of these subpopulations. Perform a test of the hypothesis that this association does not differ in these subpopulations.
+
+```{r question-1c}
+# Create a binary WBC variable
+ccg_dat <- within(ccg_dat, wbc_bin <- ifelse(wbc>=100, 1, 0))
+# Fit a PH model of time to relapse from treatment, binary WBC, and age
+coxph(ccg_surv ~ rx*wbc_bin + age, ccg_dat) %>% summary
+
+```
+
+We fit a Cox proportional hazards model of time until blood cancer relapse given a patient's treatment group, allowing for effect modification from white blood cell count above 10,000 and adjusting for age at baseline. We estimate the hazards ratio comparing two patient populations of the same age at baseline and with white blood cell count less than or equal to 10,000, who differ in their inclusion of Dactinomycin to a standard-of-care treatment, to be 0.775 (95% CI: 0.481-1.25). Among patients with white blood cell count greater than 10,000, we estimate this hazard ratio to be 0.82 (95% CI: ???). A log-rank (**VERIFY**) test determined there is insufficient evidence that a white blood cell count greater than 10,000 moderates the risk associated with Dactinomycin treatment.
+
+(d) Describe and fit a proportional hazards model to estimate the association between risk of relapse and treatment adjusting for white blood cell count, age, and recruitment site. Provide an estimate and 95% confidence interval for each of the resulting hazard ratios.
+
+```{r question-1d}
+# Fit a PH model of time to relapse from treatment, binary WBC, and age
+coxph(ccg_surv ~ rx + wbc + age + institution, ccg_dat) %>% summary
+
+```
+
+We fit a Cox proportional hazards model of time until blood cancer relapse given a patient's treatment group, adjusting for white blood cell count, age at baseline, and recruitment site. 
+
+-   We estimate the hazards ratio comparing two patient populations of the same white blood cell count, age at baseline, and recruitment site, who differ in their inclusion of Dactinomycin to a standard-of-care treatment, to be 0.743 (95% CI: 0.552-0.999), with those administered Dactinomycin facing lower risk of relapse.
+
+-   We estimate the hazards ratio comparing two patient populations of the same treatment, age at baseline, and recruitment site, who differ in their white blood cell count by 100 units, to be 1 (95% CI: 1-1), which is not statistically significant.
+
+-   We estimate the hazards ratio comparing two patient populations of the same treatment, white blood cell count, and recruitment site, who differ in their age at baseline by 1 year, to be 1.004 (95% CI: 0.960-1.051), which is not statistically significant.
+
+-   We estimate the hazards ratio comparing two patient populations of the same treatment, white blood cell count, and age at baseline, who differ in their recruitment center, to be 0.999 (95% CI: 0.974-1.024), which is not statistically significant.
+
+(e) Based on the proportional hazards model you fitted in (b), display on a single graph estimates of the relapse-free survival curves for the subpopulation of
+
+i. 5 year-old treated patients with `wbc` = 45;
+
+ii. 5 year-old control patients with `wbc` = 45;
+
+iii. 5 year-old treated patients with `wbc` = 210;
+
+iv. 5 year-old control patients with `wbc` = 210.
+
+```{r question-1e}
+# Fit a PH model of time to relapse from treatment, WBC, and age
+fitb <- coxph(ccg_surv ~ rx + wbc + age, ccg_dat)
+
+# Plot subgroup survival curves
+survfit(fitb, newdata=data.frame(age=5,rx=1,wbc=45)) %>% 
+  plot(col=2, lwd=2, conf.int=F)
+survfit(fitb, newdata=data.frame(age=5,rx=0,wbc=45), conf.type="none") %>% 
+  lines(col=4, lwd=2, conf.int=F)
+survfit(fitb, newdata=data.frame(age=5,rx=1,wbc=210), conf.type="none") %>% 
+  lines(col=6, lwd=2, conf.int=F)
+survfit(fitb, newdata=data.frame(age=5,rx=0,wbc=210), conf.type="none") %>% 
+  lines(col=8, lwd=2, conf.int=F)
+legend(600,0.97, fill=c(2,4,6,8), bty='n',
+       legend=c("treated, wbc=45","control, wbc=45",
+                "treated, wbc=210","control, wbc=45"))
+
+```
+
+
+```{r question-1e-suppl, include=FALSE}
+#we can "facet" this to display the plots side-by-side
+ph_fit <- coxph(ccg_surv ~ rx + wbc + age, ccg_dat)
+p <- ggsurvplot(ph_fit, data = ccg_dat,
+           conf.int = T,
+           risk.table = T,
+           palette = c("blue", "red"), 
+           legend.title = "Group",
+           legend.labs = c("Control", "Treatment"),
+           title = "Kaplan-Meier Survival Curves",
+           xlab = "Time", 
+           ylab = "Survival Probability",
+           ggtheme = theme_minimal())
+
+p$plot + theme_bw() + facet_wrap(~rx)
+
+
+fit_1 <- coxph(Surv(futime,as.numeric(death==1)) ~ 1, subset=(lambda>=1.68), data=flchain)
+fit_0 <- coxph(Surv(futime,as.numeric(death==1)) ~ 1 ,subset=(lambda<1.68), data=flchain)
+
+b_1 <- basehaz(fit_1); b_0 <- basehaz(fit_0);
+
+Lambda_0 <- stepfun(b_0$time/365.25, c(0,b_0$hazard));
+
+Lambda_1 <- stepfun(b_1$time/365.25, c(0,b_1$hazard));
+
+curve(Lambda_1, 0, 13, col=2, n=10000, ylim=c(0,0.6), xaxt='n', 
+      ylab="cumulative hazard", 
+      xlab="time from recruitment until death (in years)", 
+      cex.axis=0.8, cex.lab=0.8, lwd=1.5)
+axis(1, at=seq(0,13,by=1), cex.axis=0.8)
+
+curve(Lambda_0, add=TRUE, n=10000, col=4, lwd=1.5)
+
+legend(0, 0.58, 
+       legend=c(expression(paste(kappa," FLC ")>" 1.68 "),
+                expression(paste(kappa," FLC ")<=" 1.68 ")),
+       fill=c(2,4), cex=0.8)
+```
+
+## PROBLEM 2.
+
+```{r question-2a}
+#### Question 2 ####
+
+```
+
+```{r question-2b}
+
+```
+
+```{r question-2c}
+
+```
+
+
+**End of report. Code appendix begins on the next page.**
+
+\pagebreak
+
+## Code Appendix
+
+```{r allcode, ref.label = knitr::all_labels(), echo=TRUE, eval=FALSE}
+```
+
+**End of document.**
