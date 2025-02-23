@@ -24,16 +24,18 @@ library(survival)  # survival model
 library(dplyr)     # data manipulation
 library(modelr)    # model manipulation
 library(survminer)
+library(muhaz)     # hazard function
 
 # library(knitr)     # pretty tables
 # library(ggplot2)   # data visualization
 
-# library(muhaz)     # hazard function
-
 # Load data
+ccg_dat <- read.csv("../data/ccg803.csv")
 methadone <- read.csv("../data/methadone.csv")
 
-# Handle missing data
+# Handle missing data (there is none)
+anyNA(ccg_dat)
+anyNA(methadone)
 
 ```
 
@@ -47,7 +49,6 @@ Dactinomycin administration (`rx`), age at baseline (`age`), white blood cell co
 
 ```{r question-1a}
 #### Question 1 ####
-ccg_dat <- read.csv("../data/ccg803.csv")
 ccg_surv <- with(ccg_dat, survival::Surv(duration, relapse))
 
 # Fit a PH model of time to relapse from treatment
@@ -55,7 +56,7 @@ survival::coxph(ccg_surv ~ rx, ccg_dat) %>% summary
 
 ```
 
-We fit a Cox proportional hazards model of time until blood cancer relapse given a patient's treatment group. We estimate the hazards ratio comparing patients who were administered Dactinomycin treatment with standard-of-care to those with only standard-of-care to be 0.738 (95% CI: 0.55-0.992). Because our confidence interval for the hazard ratio ranges from half to equal, we cannot claim with certainty that the sample has sufficient statistical evidence of Dactinomycin being associated with better outcomes. This is illustrated in all three provided statistical tests producing p-values that are approximately equal to $\alpha$.
+We fit a Cox proportional hazards model of time until blood cancer relapse given a patient's treatment group. We estimate the hazards ratio comparing patients who were administered Dactinomycin treatment with standard-of-care to those with only standard-of-care to be 0.738 (95% CI: 0.55-0.992). Because our confidence interval for the hazard ratio ranges from half to equal, we cannot claim with certainty that the sample has sufficient statistical evidence that Dactinomycin is associated with better outcomes. This is illustrated in all three provided statistical tests producing p-values that are approximately equal to $\alpha$.
 
 (b) Describe and fit a proportional hazards model to estimate the association between risk of relapse and treatment adjusting for white blood cell count and age. Provide an estimate and 95% confidence interval for each of the resulting hazard ratios
 
@@ -65,42 +66,44 @@ coxph(ccg_surv ~ rx + wbc + age, ccg_dat) %>% summary
 
 ```
 
-We fit a Cox proportional hazards model of time until blood cancer relapse given a patient's treatment group, adjusting for white blood cell count and age at baseline. We estimate the hazards ratio comparing two patient populations of the same white blood cell count and age at baseline, who differ in their inclusion of Dactinomycin to a standard-of-care treatment, to be 0.744 (95% CI: 0.553-0.999), with those administered Dactinomycin facing lower risk of relapse. 
-From this model, we again believe the probability of entering cancer relapse is higher for patients who did not receive Dactinomycin, although the statistical evidence is not strong according to our significance level.
+We fit a similar Cox PH model adjusting for white blood cell count and age at baseline. We estimate the hazards ratio comparing two patient populations of the same white blood cell count and age at baseline, who differ in their inclusion of Dactinomycin to a standard-of-care treatment, to be 0.744 (95% CI: 0.553-0.999), with those administered Dactinomycin facing lower risk of relapse. From this model, we again believe the chance of cancer relapse is higher for patients who did not receive Dactinomycin, although the statistical evidence is not strong considering our significance level.
 
-(c) Describe and fit a proportional hazards model to determine whether the association between risk of relapse and treatment adjusting for white blood cell count and age differs in subpopulations of patients defined by white blood cell count being either below 10,000 (`wbc`<100), or above or at 10,000 (`wbc`>=100). Provide an estimate and 95% confidence interval for the hazard ratio corresponding to each of these subpopulations. Perform a test of the hypothesis that this association does not differ in these subpopulations.
+(c) Describe and fit a proportional hazards model to determine whether the association between risk of relapse and treatment adjusting for white blood cell count and age differs in subpopulations of patients defined by white blood cell count being either below 10,000 (`wbc`\<100), or above or at 10,000 (`wbc`\>=100). Provide an estimate and 95% confidence interval for the hazard ratio corresponding to each of these subpopulations. Perform a test of the hypothesis that this association does not differ in these subpopulations.
 
 ```{r question-1c}
 # Create a binary WBC variable
 ccg_dat <- within(ccg_dat, wbc_bin <- ifelse(wbc>=100, 1, 0))
 # Fit a PH model of time to relapse from treatment, binary WBC, and age
 coxph(ccg_surv ~ rx*wbc_bin + age, ccg_dat) %>% summary
-
+# See likelihood ratio test results
+coxph(ccg_surv ~ rx*wbc_bin + age, ccg_dat) %>% anova() 
 ```
 
-We fit a Cox proportional hazards model of time until blood cancer relapse given a patient's treatment group, allowing for effect modification from white blood cell count above 10,000 and adjusting for age at baseline. We estimate the hazards ratio comparing two patient populations of the same age at baseline and with white blood cell count less than or equal to 10,000, who differ in their inclusion of Dactinomycin to a standard-of-care treatment, to be 0.775 (95% CI: 0.481-1.25). Among patients with white blood cell count greater than 10,000, we estimate this hazard ratio to be 0.82 (95% CI: ???). A log-rank (**VERIFY**) test determined there is insufficient evidence that a white blood cell count greater than 10,000 moderates the risk associated with Dactinomycin treatment.
+We fit a third Cox proportional hazards model to investigate risk associated with treatment, allowing for effect modification from white blood cell count above 10,000 and adjusting for age at baseline. We estimate the hazards ratio comparing two patient populations of the same age at baseline and with white blood cell count less than or equal to 10,000, who differ in their inclusion of Dactinomycin to a standard-of-care treatment, to be 0.775 (95% CI: 0.481-1.25). Among patients with white blood cell count greater than 10,000, we estimate this hazard ratio to be 0.82 (95% CI: ???). 
+
+A likelihood ratio test determined there is insufficient evidence that a white blood cell count greater than 10,000 moderates the hazard associated with Dactinomycin treatment (p=0.870).
 
 (d) Describe and fit a proportional hazards model to estimate the association between risk of relapse and treatment adjusting for white blood cell count, age, and recruitment site. Provide an estimate and 95% confidence interval for each of the resulting hazard ratios.
 
 ```{r question-1d}
-# Fit a PH model of time to relapse from treatment, binary WBC, and age
+# Fit a PH model of time to relapse from treatment, binary WBC, age, and treatment site
 coxph(ccg_surv ~ rx + wbc + age + institution, ccg_dat) %>% summary
 
 ```
 
-We fit a Cox proportional hazards model of time until blood cancer relapse given a patient's treatment group, adjusting for white blood cell count, age at baseline, and recruitment site. 
+We fit a fourth Cox PH model, adjusting for white blood cell count, age at baseline, and recruitment site.
 
 -   We estimate the hazards ratio comparing two patient populations of the same white blood cell count, age at baseline, and recruitment site, who differ in their inclusion of Dactinomycin to a standard-of-care treatment, to be 0.743 (95% CI: 0.552-0.999), with those administered Dactinomycin facing lower risk of relapse.
 
--   We estimate the hazards ratio comparing two patient populations of the same treatment, age at baseline, and recruitment site, who differ in their white blood cell count by 100 units, to be 1 (95% CI: 1-1), which is not statistically significant.
+-   We estimate the hazards ratio comparing two patient populations of the same treatment, age at baseline, and recruitment site, who differ in their white blood cell count by 100 units, to be 1.00 (95% CI: 1.00-1.00), which is not statistically significant.
 
 -   We estimate the hazards ratio comparing two patient populations of the same treatment, white blood cell count, and recruitment site, who differ in their age at baseline by 1 year, to be 1.004 (95% CI: 0.960-1.051), which is not statistically significant.
 
--   We estimate the hazards ratio comparing two patient populations of the same treatment, white blood cell count, and age at baseline, who differ in their recruitment center, to be 0.999 (95% CI: 0.974-1.024), which is not statistically significant.
+-   We estimate the hazards ratio comparing two patient populations of the same treatment, white blood cell count, and age at baseline, who differ in their recruitment center identifier by 1, to be 0.999 (95% CI: 0.974-1.024), which is not statistically significant.
 
 (e) Based on the proportional hazards model you fitted in (b), display on a single graph estimates of the relapse-free survival curves for the subpopulation of
 
-i. 5 year-old treated patients with `wbc` = 45;
+i.  5 year-old treated patients with `wbc` = 45;
 
 ii. 5 year-old control patients with `wbc` = 45;
 
@@ -108,81 +111,191 @@ iii. 5 year-old treated patients with `wbc` = 210;
 
 iv. 5 year-old control patients with `wbc` = 210.
 
-```{r question-1e}
+```{r question-1e, fig.asp=1, fig.cap="Time to blood cancer relapse for patients aged 5 years at entry. Survival is estimated from a Cox proportional hazard model"}
 # Fit a PH model of time to relapse from treatment, WBC, and age
 fitb <- coxph(ccg_surv ~ rx + wbc + age, ccg_dat)
 
 # Plot subgroup survival curves
 survfit(fitb, newdata=data.frame(age=5,rx=1,wbc=45)) %>% 
-  plot(col=2, lwd=2, conf.int=F)
+  plot(col=2, lwd=2, conf.int=F, xlab="Follow-up time", ylab="Survival probability")
 survfit(fitb, newdata=data.frame(age=5,rx=0,wbc=45), conf.type="none") %>% 
-  lines(col=4, lwd=2, conf.int=F)
+  lines(col=3, lwd=2, conf.int=F)
 survfit(fitb, newdata=data.frame(age=5,rx=1,wbc=210), conf.type="none") %>% 
-  lines(col=6, lwd=2, conf.int=F)
+  lines(col=4, lwd=2, conf.int=F)
+survfit(fitb, newdata=data.frame(age=5,rx=0,wbc=210), conf.type="none") %>% 
+  lines(col=5, lwd=2, conf.int=F)
+legend(600,0.97, fill=2:5, bty='n', legend=c("Treated, WBC=45","Control, WBC=45",
+                                             "Treated, WBC=210","Control, WBC=210"))
+
+```
+
+Based on estimates from the (1b) Cox PH model for patients aged 5 years at baseline, longer time-to-relapse appears to be associated with treatment and only slightly related to white blood cell count (Figure 1).
+
+## PROBLEM 2.
+
+In this problem, you will once more revisit the dataset on methadone maintenance programs for heroin addicts you studied in Problem Sets 1 and 2. Please refer to Problem Set 1 for a description of the relevant variables.
+
+As indicated before, Caplehorn and Bell (1991) provided an analysis of these data, seeking to identify factors favoring the retention of subjects because maintenance is known to be effective only in patients who remain in treatment. They were particularly interested in determining whether daily dosage is related to the probability of retention, and whether other factors can be used to identify subjects at high risk for failing to be retained.
+
+(a) Describe and fit a proportional hazards model to estimate the association between risk of exit from maintenance and methadone dosage adjusting for history of incarceration and clinic as regular predictors. Provide an estimate and 95% confidence interval for each of the resulting hazard ratios.
+
+```{r question-2a}
+#### Question 2 ####
+met_surv <- with(methadone, Surv(time, event))
+
+# Fit a PH model of time to exit from dosage adjusting for incarceration history and clinic
+coxph(met_surv ~ dose + prison + clinic, methadone) %>% summary
+
+```
+
+We fit a Cox proportional hazards model of time until exit from methadone maintenance (as opposed to continued retention) given a patient's daily methadone dosage, adjusting for a history of incarceration and clinic.
+
+-   We estimate the hazards ratio comparing two patient populations of a similar history of incarceration (any or none) and clinic, who differ in daily dosage by 1 mg/day, to be 0.965 (95% CI: 0.953-0.977), with those administered higher dosage being associated with higher retention.
+
+-   We estimate the hazards ratio comparing two patient populations from the same clinic and receiving the same daily dosage, one with any history of incarceration and the other without, to be 1.386 (95% CI: 0.999-1.924), with any history having a association with lower retention.
+
+-   We estimate the hazards ratio comparing two patient populations of a similar history of incarceration and receiving the same daily dosage, one from clinic 1 and the other from clinic 2, to be 0.364 (95% CI: 0.239-0.555), with clinic 2 being associated with much higher retention.
+
+In the following questions, use stratified proportional hazards model with clinic as stratifying variable.
+
+(b) Describe and fit a proportional hazards model to estimate the association between risk of exit from maintenance and methadone dosage adjusting for clinic via stratification as well as adjusting for history of previous incarceration. Provide an estimate and 95% confidence interval for each of the resulting hazard ratios. Discuss the implication of using clinic as a stratifying variable. Has the interpretation of these hazard ratios changed relative to the model you fitted in (a)?
+
+```{r question-2b}
+# Fit a PH model of time to exit from dosage adjusting for incarceration history and stratifying by clinic
+coxph(met_surv ~ dose + prison + strata(clinic), methadone) %>% summary
+
+```
+
+We fit a similar Cox PH model, still adjusting for a history of incarceration, but now stratifying by clinic.
+
+We estimate the hazards ratio comparing two patient populations with the same clinic and history of incarceration (any or none), who differ in daily dosage by 1 mg/day, to be 0.966 (95% CI: 0.953-0.978), with those administered higher dosage being associated with higher retention.
+
+Comparing those with any history of incarceration to those without, adjusting for treatment and clinic, we estimate the hazard of exiting the program among the former to be 1.476 times greater than the latter, throughout the study period (95% CI for HR: 1.060-2.056).
+
+Stratified proportional hazard models do not estimate hazard ratios for stratification variables, so we do not have an estimate of hazard associated with clinic. However, interpretation of other associations do not change.
+
+(c) Describe and fit a proportional hazards model to determine whether the association between methadone dosage and risk of exit from maintenance adjusting for history of incarceration and clinic is different in those with and without a history of incarceration? Provide an estimate and 95% confidence interval for any summary that allows you to answer this question. Based on this model, provide an estimate and 95% confidence interval for the hazard ratio comparing patients from a given clinic with a history of incarceration receiving 100 mg/day of methadone to patients from the same clinic without a history of incarceration receiving 40 mg/day of methadone.
+
+```{r question-2c}
+# Fit a PH model of time to exit from dosage adjusting for clinic and with effect modification from incarceration history
+coxph(met_surv ~ dose*prison + clinic, methadone) %>% summary
+
+```
+
+We fit a third Cox proportional hazards model of time until exit from methadone maintenance given a patient's daily methadone dosage, adjusting for clinic and with effect modification from history of incarceration.
+
+We estimate the hazards ratio associated with an 1 unit increase in daily dosage to be 0.962 (95% CI: 0.947-0.977) among patients with any history of incarceration, and 0.97 (95% CI: ***-***) among patients without a history of incarceration, controlling for clinic. **COMPLETE THIS**.
+
+In order words, we believe this hazard ratio is 1.009 times greater among patients with any history of incarceration (95% CI for ratio of hazard ratios: 0.984-1.035), which is to say that they are statistically equivalent.
+
+```{r supplementary-estimating-hazard, include=FALSE}
+#######################
+#### SUPPLEMENTARY #### 
+#######################
+
+### ESTIMATING HAZARDS ###
+
+## Assess proportional hazards from kernel methods
+with(ccg_dat, muhaz::muhaz(duration, relapse, subset=(rx==0))) %>% 
+  plot(lwd=3, col="lightblue", main="Estimated hazard of cancer relapse")
+with(ccg_dat, muhaz::muhaz(duration, relapse, subset=(rx==1))) %>% 
+  lines(lwd=3, col="darkblue")
+legend(0,0.00375, fill=c("darkblue","lightblue"), bty='n',
+       legend=c("treated","control"))
+
+
+## Assess proportional hazards from kernel methods conditional on binary WBC
+# WBC less than or equal to 100
+with(ccg_dat %>% filter(rx==0 & wbc_bin==0), muhaz::muhaz(duration, relapse)) %>% 
+  plot(lwd=3, col="lightblue", main="Estimated hazard of cancer relapse among WBC<=100")
+with(ccg_dat %>% filter(rx==1 & wbc_bin==0), muhaz::muhaz(duration, relapse)) %>% 
+  lines(lwd=3, col="darkblue")
+legend(0,0.0012, fill=c("darkblue","lightblue"), bty='n',
+       legend=c("treated","control"))
+
+# WBC greater than 100
+with(ccg_dat %>% filter(rx==0 & wbc_bin==1), muhaz::muhaz(duration, relapse)) %>% 
+  plot(lwd=3, col="lightblue", main="Estimated hazard of cancer relapse among WBC>100")
+with(ccg_dat %>% filter(rx==1 & wbc_bin==1), muhaz::muhaz(duration, relapse)) %>% 
+  lines(lwd=3, col="darkblue")
+legend(0,0.00375, fill=c("darkblue","lightblue"), bty='n',
+       legend=c("treated","control"))
+
+
+## Assess proportional hazards from kernel methods conditional on treatment site
+# Site 1
+with(ccg_dat %>% filter(rx==0 & institution==1), muhaz::muhaz(duration, relapse)) %>% 
+  plot(lwd=3, col="lightblue", main="Estimated hazard of cancer relapse among Site 1")
+with(ccg_dat %>% filter(rx==1 & institution==1), muhaz::muhaz(duration, relapse)) %>% 
+  lines(lwd=3, col="darkblue")
+legend(0,0.006, fill=c("darkblue","lightblue"), bty='n',
+       legend=c("treated","control"))
+
+# There are many more sites...
+
+```
+
+```{r supplementary-schoenfeld-residuals, include=FALSE}
+### SCHOENFELD RESIDUALS ###
+
+```
+
+```{r supplementary-question-1e, fig.asp=1, include=FALSE}
+### QUESTION 1E SUPPLEMENTARY ###
+
+# Highlighting Treated WBC=45
+survfit(fitb, newdata=data.frame(age=5,rx=0,wbc=45), conf.type="none") %>% 
+  plot(col=8, lwd=2, conf.int=F)
+survfit(fitb, newdata=data.frame(age=5,rx=1,wbc=210), conf.type="none") %>% 
+  lines(col=8, lwd=2, conf.int=F)
 survfit(fitb, newdata=data.frame(age=5,rx=0,wbc=210), conf.type="none") %>% 
   lines(col=8, lwd=2, conf.int=F)
-legend(600,0.97, fill=c(2,4,6,8), bty='n',
+survfit(fitb, newdata=data.frame(age=5,rx=1,wbc=45)) %>% 
+  lines(col=2, lwd=2)
+legend(600,0.97, fill=c(2,8,8,8), bty='n',
+       legend=c("treated, wbc=45","control, wbc=45",
+                "treated, wbc=210","control, wbc=45"))
+
+# Highlighting Control WBC=45
+survfit(fitb, newdata=data.frame(age=5,rx=1,wbc=210), conf.type="none") %>% 
+  plot(col=8, lwd=2, conf.int=F)
+survfit(fitb, newdata=data.frame(age=5,rx=0,wbc=210), conf.type="none") %>% 
+  lines(col=8, lwd=2, conf.int=F)
+survfit(fitb, newdata=data.frame(age=5,rx=1,wbc=45)) %>% 
+  lines(col=8, lwd=2, conf.int=F)
+survfit(fitb, newdata=data.frame(age=5,rx=0,wbc=45), conf.type="none") %>% 
+  lines(col=2, lwd=2)
+legend(600,0.97, fill=c(8,2,8,8), bty='n',
+       legend=c("treated, wbc=45","control, wbc=45",
+                "treated, wbc=210","control, wbc=45"))
+
+# Highlighting Treated WBC=210
+survfit(fitb, newdata=data.frame(age=5,rx=0,wbc=45), conf.type="none") %>% 
+  plot(col=8, lwd=2, conf.int=F)
+survfit(fitb, newdata=data.frame(age=5,rx=0,wbc=210), conf.type="none") %>% 
+  lines(col=8, lwd=2, conf.int=F)
+survfit(fitb, newdata=data.frame(age=5,rx=1,wbc=45)) %>% 
+  lines(col=8, lwd=2, conf.int=F)
+survfit(fitb, newdata=data.frame(age=5,rx=1,wbc=210), conf.type="none") %>% 
+  lines(col=2, lwd=2)
+legend(600,0.97, fill=c(8,8,2,8), bty='n',
+       legend=c("treated, wbc=45","control, wbc=45",
+                "treated, wbc=210","control, wbc=45"))
+
+# Highlighting Control WBC=210
+survfit(fitb, newdata=data.frame(age=5,rx=1,wbc=210), conf.type="none") %>% 
+  plot(col=8, lwd=2, conf.int=F)
+survfit(fitb, newdata=data.frame(age=5,rx=1,wbc=45)) %>% 
+  lines(col=8, lwd=2, conf.int=F)
+survfit(fitb, newdata=data.frame(age=5,rx=0,wbc=45), conf.type="none") %>% 
+  lines(col=8, lwd=2, conf.int=F)
+survfit(fitb, newdata=data.frame(age=5,rx=0,wbc=210), conf.type="none") %>% 
+  lines(col=2, lwd=2)
+legend(600,0.97, fill=c(8,8,8,2), bty='n',
        legend=c("treated, wbc=45","control, wbc=45",
                 "treated, wbc=210","control, wbc=45"))
 
 ```
-
-
-```{r question-1e-suppl, include=FALSE}
-#we can "facet" this to display the plots side-by-side
-ph_fit <- coxph(ccg_surv ~ rx + wbc + age, ccg_dat)
-p <- ggsurvplot(ph_fit, data = ccg_dat,
-           conf.int = T,
-           risk.table = T,
-           palette = c("blue", "red"), 
-           legend.title = "Group",
-           legend.labs = c("Control", "Treatment"),
-           title = "Kaplan-Meier Survival Curves",
-           xlab = "Time", 
-           ylab = "Survival Probability",
-           ggtheme = theme_minimal())
-
-p$plot + theme_bw() + facet_wrap(~rx)
-
-
-fit_1 <- coxph(Surv(futime,as.numeric(death==1)) ~ 1, subset=(lambda>=1.68), data=flchain)
-fit_0 <- coxph(Surv(futime,as.numeric(death==1)) ~ 1 ,subset=(lambda<1.68), data=flchain)
-
-b_1 <- basehaz(fit_1); b_0 <- basehaz(fit_0);
-
-Lambda_0 <- stepfun(b_0$time/365.25, c(0,b_0$hazard));
-
-Lambda_1 <- stepfun(b_1$time/365.25, c(0,b_1$hazard));
-
-curve(Lambda_1, 0, 13, col=2, n=10000, ylim=c(0,0.6), xaxt='n', 
-      ylab="cumulative hazard", 
-      xlab="time from recruitment until death (in years)", 
-      cex.axis=0.8, cex.lab=0.8, lwd=1.5)
-axis(1, at=seq(0,13,by=1), cex.axis=0.8)
-
-curve(Lambda_0, add=TRUE, n=10000, col=4, lwd=1.5)
-
-legend(0, 0.58, 
-       legend=c(expression(paste(kappa," FLC ")>" 1.68 "),
-                expression(paste(kappa," FLC ")<=" 1.68 ")),
-       fill=c(2,4), cex=0.8)
-```
-
-## PROBLEM 2.
-
-```{r question-2a}
-#### Question 2 ####
-
-```
-
-```{r question-2b}
-
-```
-
-```{r question-2c}
-
-```
-
 
 **End of report. Code appendix begins on the next page.**
 
