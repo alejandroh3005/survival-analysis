@@ -1,0 +1,50 @@
+---
+title: "Identifying Prognostic Factors in Acute Leukemia Patients"
+subtitle: "Survival Analysis of Bone Marrow Transplant Outcomes"
+author:
+  - Jingheng Chen^[Institute for Public Health Genetics, University of Washington, Seattle, Washington]
+  - Alejandro D. Hernandez^[Department of Biostatistics, University of Washington, Seattle, Washington]
+  - Ann Richey^[Department of Epidemiology, University of Washington, Seattle, Washington]
+date: "Last revised February 25, 2025"
+output: pdf_document
+---
+
+```{r setup,include=F}
+# clear environment
+rm(list=ls())
+
+# setup options
+knitr::opts_chunk$set(echo=FALSE, warning=FALSE, message=FALSE)
+options(knitr.kable.NA = '-', digits = 2)
+labs = knitr::all_labels()
+labs = labs[!labs %in% c("setup", "allcode")]
+```
+
+```{r load}
+## Load relevant packages
+# library(dplyr)      # data manipulation
+# library(ggplot2)    # data visualization
+# library(gtsummary)  # data summary
+# library(gt)         # save gt objects
+# library(broom)      # tidy tables
+# library(knitr)      # pretty tables
+
+## Load data
+bmt <- read.csv("../data/bmt.csv")
+dim(bmt)  # 137 patients, 22 features
+names(bmt)
+
+```
+
+
+
+**End of report. Code appendix begins on the next page.**
+
+\pagebreak
+
+## Code Appendix
+
+```{r allcode, ref.label = knitr::all_labels(), echo=TRUE, eval=FALSE}
+```
+
+**End of document.**

@@ -111,7 +111,7 @@ iii. 5 year-old treated patients with `wbc` = 210;
 
 iv. 5 year-old control patients with `wbc` = 210.
 
-```{r question-1e, fig.asp=1, fig.cap="Time to blood cancer relapse for patients aged 5 years at entry. Survival is estimated from a Cox proportional hazard model"}
+```{r question-1e, fig.asp=1, fig.cap="Time to blood cancer relapse for patients aged 5 years at entry. Survival is estimated from a Cox proportional hazard model."}
 # Fit a PH model of time to relapse from treatment, WBC, and age
 fitb <- coxph(ccg_surv ~ rx + wbc + age, ccg_dat)
 
@@ -129,11 +129,13 @@ legend(600,0.97, fill=2:5, bty='n', legend=c("Treated, WBC=45","Control, WBC=45"
 
 ```
 
-Based on estimates from the (1b) Cox PH model for patients aged 5 years at baseline, longer time-to-relapse appears to be associated with treatment and only slightly related to white blood cell count (Figure 1).
+Based on estimates from the (1b) Cox PH model for patients aged 5 years at baseline, longer time-to-relapse appears to be associated with treatment and only slightly related to white blood cell count (Figure 1). See Supplementary for survival curves with confidence intervals. 
+
+\newpage
 
 ## PROBLEM 2.
 
-In this problem, you will once more revisit the dataset on methadone maintenance programs for heroin addicts you studied in Problem Sets 1 and 2. Please refer to Problem Set 1 for a description of the relevant variables.
+In this problem, you will once more revisit the dataset on methadone maintenance programs for heroin addiction you studied in Problem Sets 1 and 2. Please refer to Problem Set 1 for a description of the relevant variables.
 
 As indicated before, Caplehorn and Bell (1991) provided an analysis of these data, seeking to identify factors favoring the retention of subjects because maintenance is known to be effective only in patients who remain in treatment. They were particularly interested in determining whether daily dosage is related to the probability of retention, and whether other factors can be used to identify subjects at high risk for failing to be retained.
 
@@ -168,25 +170,37 @@ coxph(met_surv ~ dose + prison + strata(clinic), methadone) %>% summary
 
 We fit a similar Cox PH model, still adjusting for a history of incarceration, but now stratifying by clinic.
 
-We estimate the hazards ratio comparing two patient populations with the same clinic and history of incarceration (any or none), who differ in daily dosage by 1 mg/day, to be 0.966 (95% CI: 0.953-0.978), with those administered higher dosage being associated with higher retention.
+-   We estimate the hazards ratio comparing two patient populations with the same clinic and history of incarceration (any or none), who differ in daily dosage by 1 mg/day, to be 0.966 (95% CI: 0.953-0.978), with those administered higher dosage being associated with higher retention.
 
-Comparing those with any history of incarceration to those without, adjusting for treatment and clinic, we estimate the hazard of exiting the program among the former to be 1.476 times greater than the latter, throughout the study period (95% CI for HR: 1.060-2.056).
+-   Comparing those with any history of incarceration to those without, adjusting for treatment and clinic, we estimate the hazard of exiting the program among the former to be 1.476 times greater than the latter, throughout the study period (95% CI for HR: 1.060-2.056).
 
-Stratified proportional hazard models do not estimate hazard ratios for stratification variables, so we do not have an estimate of hazard associated with clinic. However, interpretation of other associations do not change.
+Stratified proportional hazard models do not estimate hazard ratios for stratification variables, so we do not have an estimate of hazard associated with clinic. 
+
+The interpretation of estimated associations changes slightly. As an example, our estimates of the hazards ratio associated with methadone dosage from (a) and (b) are both assumed to be the same across clinics and other covariates, but the former is like a "global" effect and the latter is like a "within-clinic" effect. This is because the stratified Cox PH model does not have a baseline hazard that is common to both clinics, and therefore relies on a much weaker proportional hazards assumption. Still, both models assume that the association is the same at both clinics. Aside from this technical detail, interpretation is essentially the same.
 
 (c) Describe and fit a proportional hazards model to determine whether the association between methadone dosage and risk of exit from maintenance adjusting for history of incarceration and clinic is different in those with and without a history of incarceration? Provide an estimate and 95% confidence interval for any summary that allows you to answer this question. Based on this model, provide an estimate and 95% confidence interval for the hazard ratio comparing patients from a given clinic with a history of incarceration receiving 100 mg/day of methadone to patients from the same clinic without a history of incarceration receiving 40 mg/day of methadone.
 
 ```{r question-2c}
 # Fit a PH model of time to exit from dosage adjusting for clinic and with effect modification from incarceration history
-coxph(met_surv ~ dose*prison + clinic, methadone) %>% summary
+coxfit <- coxph(met_surv ~ dose*prison + clinic, methadone)
+
+# Get 95% CI for HR within those with incarceration history
+coxfit_coef <- coef(coxfit) 
+coxfit_se <- sqrt(diag(vcov(coxfit)))  # Standard errors
+
+# 95% CI for HR within those without incarceration history
+exp(coxfit_coef["dose"] + c(-1,1) * 1.96 * coxfit_se["dose"])
+
+# 95% CI for HR within those with incarceration history
+incarc_se <- sqrt(se_est["treatment"]^2 + se_est["treatment:covariate"]^2 + 
+                     2 * vcov(cox_model)["treatment", "treatment:covariate"])
+exp(coxfit_coef["dose"] + c(-1,1) * 1.96 * incarc_se)
 
 ```
 
 We fit a third Cox proportional hazards model of time until exit from methadone maintenance given a patient's daily methadone dosage, adjusting for clinic and with effect modification from history of incarceration.
 
-We estimate the hazards ratio associated with an 1 unit increase in daily dosage to be 0.962 (95% CI: 0.947-0.977) among patients with any history of incarceration, and 0.97 (95% CI: ***-***) among patients without a history of incarceration, controlling for clinic. **COMPLETE THIS**.
-
-In order words, we believe this hazard ratio is 1.009 times greater among patients with any history of incarceration (95% CI for ratio of hazard ratios: 0.984-1.035), which is to say that they are statistically equivalent.
+We estimate the hazards ratio associated with an 1 unit increase in daily dosage to be 0.962 (95% CI: 0.947-0.977) among patients with any history of incarceration, and 0.97 (95% CI: ***-***) among patients without a history of incarceration, controlling for clinic. In order words, we believe this hazard ratio is 1.009 times greater among patients with any history of incarceration (95% CI for ratio of hazard ratios: 0.984-1.035), which is to say that they are statistically equivalent.
 
 ```{r supplementary-estimating-hazard, include=FALSE}
 #######################
@@ -237,11 +251,13 @@ legend(0,0.006, fill=c("darkblue","lightblue"), bty='n',
 
 ```{r supplementary-schoenfeld-residuals, include=FALSE}
 ### SCHOENFELD RESIDUALS ###
+# (Intentionally left blank)
 
 ```
 
-```{r supplementary-question-1e, fig.asp=1, include=FALSE}
+```{r supplementary-question-1e, fig.asp=1, fig.cap=" Times to blood cancer relapse for patients aged 5 years at entry. Survival is estimated from a Cox proportional hazard model."}
 ### QUESTION 1E SUPPLEMENTARY ###
+par(mfrow=c(2,2))
 
 # Highlighting Treated WBC=45
 survfit(fitb, newdata=data.frame(age=5,rx=0,wbc=45), conf.type="none") %>% 
@@ -252,9 +268,9 @@ survfit(fitb, newdata=data.frame(age=5,rx=0,wbc=210), conf.type="none") %>%
   lines(col=8, lwd=2, conf.int=F)
 survfit(fitb, newdata=data.frame(age=5,rx=1,wbc=45)) %>% 
   lines(col=2, lwd=2)
-legend(600,0.97, fill=c(2,8,8,8), bty='n',
+legend(400,1.05, fill=c(2,8,8,8), bty='n',
        legend=c("treated, wbc=45","control, wbc=45",
-                "treated, wbc=210","control, wbc=45"))
+                "treated, wbc=210","control, wbc=210"))
 
 # Highlighting Control WBC=45
 survfit(fitb, newdata=data.frame(age=5,rx=1,wbc=210), conf.type="none") %>% 
@@ -265,9 +281,9 @@ survfit(fitb, newdata=data.frame(age=5,rx=1,wbc=45)) %>%
   lines(col=8, lwd=2, conf.int=F)
 survfit(fitb, newdata=data.frame(age=5,rx=0,wbc=45), conf.type="none") %>% 
   lines(col=2, lwd=2)
-legend(600,0.97, fill=c(8,2,8,8), bty='n',
+legend(400,1.05, fill=c(8,2,8,8), bty='n',
        legend=c("treated, wbc=45","control, wbc=45",
-                "treated, wbc=210","control, wbc=45"))
+                "treated, wbc=210","control, wbc=210"))
 
 # Highlighting Treated WBC=210
 survfit(fitb, newdata=data.frame(age=5,rx=0,wbc=45), conf.type="none") %>% 
@@ -278,9 +294,9 @@ survfit(fitb, newdata=data.frame(age=5,rx=1,wbc=45)) %>%
   lines(col=8, lwd=2, conf.int=F)
 survfit(fitb, newdata=data.frame(age=5,rx=1,wbc=210), conf.type="none") %>% 
   lines(col=2, lwd=2)
-legend(600,0.97, fill=c(8,8,2,8), bty='n',
+legend(400,1.05, fill=c(8,8,2,8), bty='n',
        legend=c("treated, wbc=45","control, wbc=45",
-                "treated, wbc=210","control, wbc=45"))
+                "treated, wbc=210","control, wbc=210"))
 
 # Highlighting Control WBC=210
 survfit(fitb, newdata=data.frame(age=5,rx=1,wbc=210), conf.type="none") %>% 
@@ -291,9 +307,9 @@ survfit(fitb, newdata=data.frame(age=5,rx=0,wbc=45), conf.type="none") %>%
   lines(col=8, lwd=2, conf.int=F)
 survfit(fitb, newdata=data.frame(age=5,rx=0,wbc=210), conf.type="none") %>% 
   lines(col=2, lwd=2)
-legend(600,0.97, fill=c(8,8,8,2), bty='n',
+legend(400,1.05, fill=c(8,8,8,2), bty='n',
        legend=c("treated, wbc=45","control, wbc=45",
-                "treated, wbc=210","control, wbc=45"))
+                "treated, wbc=210","control, wbc=210"))
 
 ```
 
