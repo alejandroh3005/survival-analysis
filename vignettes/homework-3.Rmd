@@ -22,9 +22,9 @@ labs = labs[!labs %in% c("setup", "allcode")]
 # Load relevant packages
 library(survival)  # survival model
 library(dplyr)     # data manipulation
-library(modelr)    # model manipulation
-library(survminer)
 library(muhaz)     # hazard function
+library(msm)       # delta method
+
 
 # library(knitr)     # pretty tables
 # library(ggplot2)   # data visualization
@@ -48,7 +48,9 @@ Dactinomycin administration (`rx`), age at baseline (`age`), white blood cell co
 (a) Describe and fit a proportional hazards model to estimate the association between risk of relapse and treatment. Provide an estimate and 95% confidence interval for the hazard ratio.
 
 ```{r question-1a}
+####################
 #### Question 1 ####
+####################
 ccg_surv <- with(ccg_dat, survival::Surv(duration, relapse))
 
 # Fit a PH model of time to relapse from treatment
@@ -77,6 +79,7 @@ ccg_dat <- within(ccg_dat, wbc_bin <- ifelse(wbc>=100, 1, 0))
 coxph(ccg_surv ~ rx*wbc_bin + age, ccg_dat) %>% summary
 # See likelihood ratio test results
 coxph(ccg_surv ~ rx*wbc_bin + age, ccg_dat) %>% anova() 
+
 ```
 
 We fit a third Cox proportional hazards model to investigate risk associated with treatment, allowing for effect modification from white blood cell count above 10,000 and adjusting for age at baseline. We estimate the hazards ratio comparing two patient populations of the same age at baseline and with white blood cell count less than or equal to 10,000, who differ in their inclusion of Dactinomycin to a standard-of-care treatment, to be 0.775 (95% CI: 0.481-1.25). Among patients with white blood cell count greater than 10,000, we estimate this hazard ratio to be 0.82 (95% CI: ???). 
@@ -142,7 +145,10 @@ As indicated before, Caplehorn and Bell (1991) provided an analysis of these dat
 (a) Describe and fit a proportional hazards model to estimate the association between risk of exit from maintenance and methadone dosage adjusting for history of incarceration and clinic as regular predictors. Provide an estimate and 95% confidence interval for each of the resulting hazard ratios.
 
 ```{r question-2a}
+####################
 #### Question 2 ####
+####################
+
 met_surv <- with(methadone, Surv(time, event))
 
 # Fit a PH model of time to exit from dosage adjusting for incarceration history and clinic
@@ -192,15 +198,29 @@ coxfit_se <- sqrt(diag(vcov(coxfit)))  # Standard errors
 exp(coxfit_coef["dose"] + c(-1,1) * 1.96 * coxfit_se["dose"])
 
 # 95% CI for HR within those with incarceration history
-incarc_se <- sqrt(se_est["treatment"]^2 + se_est["treatment:covariate"]^2 + 
-                     2 * vcov(cox_model)["treatment", "treatment:covariate"])
-exp(coxfit_coef["dose"] + c(-1,1) * 1.96 * incarc_se)
+incarc_se <- sqrt(coxfit_se["dose"]^2 + coxfit_se["dose:prison"]^2 + 
+                    2 * vcov(coxfit)["dose", "dose:prison"])
+exp(coxfit_coef["dose"] + coxfit_coef["dose:prison"] + c(-1,1) * 1.96 * incarc_se)
+
+
+# Point estimate of HR: exp(100*Bdose + Bprison + 100*Bint - 40*Bdose)
+
+# CI for a hazard ratio 
+pe_hr <- exp((100-40)*coxfit_coef["dose"] + coxfit_coef["prison"] + coxfit_coef["dose:prison"])
+
+se_hr <- msm::deltamethod(g =~ exp((60*x1+x2)),
+            mean = coxfit_coef[c("dose", "prison", "dose:prison")],
+            cov = vcov(coxfit)[c("dose", "prison", "dose:prison"), 
+                               c("dose", "prison", "dose:prison")])
+pe_hr + c(-1,1) * 1.96 * se_hr
 
 ```
 
 We fit a third Cox proportional hazards model of time until exit from methadone maintenance given a patient's daily methadone dosage, adjusting for clinic and with effect modification from history of incarceration.
 
-We estimate the hazards ratio associated with an 1 unit increase in daily dosage to be 0.962 (95% CI: 0.947-0.977) among patients with any history of incarceration, and 0.97 (95% CI: ***-***) among patients without a history of incarceration, controlling for clinic. In order words, we believe this hazard ratio is 1.009 times greater among patients with any history of incarceration (95% CI for ratio of hazard ratios: 0.984-1.035), which is to say that they are statistically equivalent.
+We estimate the hazards ratio associated with an 1 unit increase in daily dosage to be 0.962 (95% CI: 0.947-0.977) among patients with any history of incarceration, and 0.97 (95% CI: 0.95-0.99) among patients without a history of incarceration, controlling for clinic. In order words, we believe this hazard ratio is 1.009 times greater among patients with any history of incarceration (95% CI for ratio of hazard ratios: 0.984-1.035), which is to say that they are statistically equivalent.
+
+Based on this model, we estimate the hazard ratio comparing patients from the same clinic, one with a history of incarceration receiving 100 mg/day of methadone to another without a history of incarceration receiving 40 mg/day of methadone, to be 0.8 (95% CI: -0.093-0.252).
 
 ```{r supplementary-estimating-hazard, include=FALSE}
 #######################
